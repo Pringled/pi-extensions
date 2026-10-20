@@ -1,0 +1,40 @@
+{
+  "name": "pi-background",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Thomas van Dongen",
+  "type": "module",
+  "homepage": "https://github.com/pringled/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/pringled/pi-extensions/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "description": "Background jobs for pi that wake the agent when they finish or print what it waits for, plus a bash timeout that never kills background work, so pi doesn't hang on a command",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "background",
+    "jobs",
+    "timeout"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pringled/pi-extensions.git",
+    "directory": "packages/pi-background"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/background.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  }
+}
