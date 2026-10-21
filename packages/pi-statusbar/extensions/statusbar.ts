@@ -1,8 +1,9 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const BAR_WIDTH = 20;
+const MIN_BAR_WIDTH = 5;
 
 function fmtTokens(n: number): string {
 	if (n < 1000) return `${n}`;
@@ -36,27 +37,32 @@ export default function (pi: ExtensionAPI) {
 					const contextWindow = contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 					// percent is null when the token count is unknown, e.g. right after compaction
 					const pctUsed = Math.min(100, Math.max(0, contextUsage?.percent ?? (contextWindow > 0 ? (used / contextWindow) * 100 : 0)));
-					const filled = Math.round((pctUsed / 100) * BAR_WIDTH);
 					const barColor = pctUsed >= 80 ? "error" : pctUsed >= 50 ? "warning" : "success";
-					const bar = theme.fg(barColor, "█".repeat(filled)) + theme.fg("dim", "░".repeat(BAR_WIDTH - filled));
+					const bar = (size: number) => {
+						const filled = Math.round((pctUsed / 100) * size);
+						return theme.fg(barColor, "█".repeat(filled)) + theme.fg("dim", "░".repeat(size - filled));
+					};
 
 					const branch = footerData.getGitBranch();
 					const branchSeg = theme.fg("mdLink", branch ? `⎇ ${branch}` : "no git");
 					// The thinking level only means something for models that can think
 					const thinking = ctx.model?.reasoning ? theme.fg("muted", ` · ${pi.getThinkingLevel()}`) : "";
 					const modelSeg = theme.fg("accent", `${ctx.model?.provider ?? "?"}/${ctx.model?.id ?? "none"}`) + thinking;
-					const contextSeg =
+					const contextSeg = (barSize: number) =>
 						theme.fg("muted", "Context: [") +
-						bar +
+						bar(barSize) +
 						theme.fg("muted", "] ") +
 						theme.fg("mdCode", `${fmtTokens(used)}/${fmtTokens(contextWindow)}`) +
 						theme.fg(barColor, ` (${pctUsed.toFixed(0)}%)`);
 					const costSeg = theme.fg("success", `$${cost.toFixed(3)}`);
 
 					const sep = theme.fg("dim", " │ ");
-					const line = [modelSeg, branchSeg, contextSeg, costSeg].join(sep);
+					const line = (barSize: number) => [modelSeg, branchSeg, contextSeg(barSize), costSeg].join(sep);
 
-					return [truncateToWidth(line, width)];
+					// Shrink the bar before cutting anything off, so the cost stays visible in narrow windows
+					const overflow = visibleWidth(line(BAR_WIDTH)) - width;
+					const barSize = Math.max(MIN_BAR_WIDTH, BAR_WIDTH - Math.max(0, overflow));
+					return [truncateToWidth(line(barSize), width)];
 				},
 			};
 		});
