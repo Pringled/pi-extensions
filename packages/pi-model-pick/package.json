@@ -1,0 +1,39 @@
+{
+  "name": "pi-model-pick",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Thomas van Dongen",
+  "type": "module",
+  "homepage": "https://github.com/pringled/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/pringled/pi-extensions/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "description": "A model picker for pi with favorites and recently used models instead of one long flat list",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "models",
+    "picker"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pringled/pi-extensions.git",
+    "directory": "packages/pi-model-pick"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/model-pick.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}

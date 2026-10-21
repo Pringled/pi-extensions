@@ -1,0 +1,46 @@
+{
+  "name": "pi-polish",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Thomas van Dongen",
+  "type": "module",
+  "homepage": "https://github.com/pringled/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/pringled/pi-extensions/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "description": "Claude Code-style polish for pi: folded tool rows with live status, syntax-highlighted diffs with word-level changes, and a ❯/● chat style",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "tui",
+    "diff",
+    "syntax-highlighting"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pringled/pi-extensions.git",
+    "directory": "packages/pi-polish"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/tools.ts",
+      "./extensions/chrome.ts"
+    ]
+  },
+  "dependencies": {
+    "diff": "9.0.0",
+    "shiki": "4.5.0",
+    "@shikijs/langs": "4.5.0",
+    "@shikijs/themes": "4.5.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}
