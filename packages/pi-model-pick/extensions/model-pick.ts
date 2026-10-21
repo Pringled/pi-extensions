@@ -1,25 +1,7 @@
-/**
- * Model Picker Extension
- *
- * The built-in /model list shows every model from every authenticated
- * provider in one long list, often with the same model repeated per provider.
- *
- * This adds a second picker, /pick (default keybinding ctrl+shift+m), that
- * groups models into "Favorites" (starred by you) and "Recent" (last used,
- * tracked automatically) ahead of the full "All" list. Favorites and recents
- * persist across sessions in ~/.pi/agent/model-picker-state.json.
- *
- * Commands:
- * - /pick        - open the grouped picker
- * - /fav         - toggle the current model as a favorite
- * - ctrl+shift+m - open the grouped picker
- */
-
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Container, fuzzyFilter, getKeybindings, Input, Key, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 
 const STATE_PATH = join(getAgentDir(), "model-picker-state.json");
@@ -32,7 +14,6 @@ interface PickerState {
 }
 
 function loadState(): PickerState {
-	if (!existsSync(STATE_PATH)) return { favorites: [], recents: [] };
 	try {
 		const raw = JSON.parse(readFileSync(STATE_PATH, "utf-8"));
 		return {
@@ -67,23 +48,18 @@ function capabilityTags(m: Model<Api>): string {
 	return tags.join(",");
 }
 
-function searchText(m: Model<Api>): string {
-	return `${m.name ?? ""} ${m.id} ${m.provider}`;
-}
-
 interface Row {
 	header?: string;
 	model?: Model<Api>;
 }
 
-export default function modelPickerExtension(pi: ExtensionAPI) {
+export default function (pi: ExtensionAPI) {
 	let state = loadState();
 
 	pi.on("session_start", () => {
 		state = loadState();
 	});
 
-	// Track recently used models.
 	pi.on("model_select", (event) => {
 		const k = key(event.model);
 		state.recents = [k, ...state.recents.filter((r) => r !== k)].slice(0, MAX_RECENTS);
@@ -103,21 +79,13 @@ export default function modelPickerExtension(pi: ExtensionAPI) {
 			.filter((m) => !favSet.has(key(m)) && !recentSet.has(key(m)))
 			.sort((a, b) => key(a).localeCompare(key(b)));
 
-		function filtered(models: Model<Api>[]): Model<Api>[] {
-			return query ? fuzzyFilter(models, query, searchText) : models;
-		}
-
 		const rows: Row[] = [];
-		function addSection(title: string, models: Model<Api>[]) {
-			const matches = filtered(models);
-			if (matches.length === 0) return;
+		for (const [title, models] of [["Favorites", favorites], ["Recent", recents], ["All", rest]] as const) {
+			const matches = query ? fuzzyFilter(models, query, (m) => `${m.name ?? ""} ${m.id} ${m.provider}`) : models;
+			if (matches.length === 0) continue;
 			rows.push({ header: title });
 			for (const m of matches) rows.push({ model: m });
 		}
-
-		addSection("Favorites", favorites);
-		addSection("Recent", recents);
-		addSection("All", rest);
 		return rows;
 	}
 
@@ -129,12 +97,8 @@ export default function modelPickerExtension(pi: ExtensionAPI) {
 		}
 
 		let query = "";
-		let rows = buildRows(available, query);
+		let rows: Row[] = [];
 		let selectedKey: string | undefined = ctx.model ? key(ctx.model) : undefined;
-		if (!rows.some((r) => r.model && key(r.model) === selectedKey)) {
-			const first = rows.find((r) => r.model);
-			selectedKey = first?.model ? key(first.model) : undefined;
-		}
 
 		function modelRows(): Row[] {
 			return rows.filter((r) => !!r.model);
@@ -148,6 +112,7 @@ export default function modelPickerExtension(pi: ExtensionAPI) {
 			selectedKey = key(models[nextPos].model as Model<Api>);
 		}
 
+		// Keeps the selection when it still matches, otherwise moves it to the first model
 		function rebuild() {
 			rows = buildRows(available, query);
 			if (!rows.some((r) => r.model && key(r.model) === selectedKey)) {
@@ -155,6 +120,7 @@ export default function modelPickerExtension(pi: ExtensionAPI) {
 				selectedKey = first?.model ? key(first.model) : undefined;
 			}
 		}
+		rebuild();
 
 		const result = await ctx.ui.custom<string | null>((_tui, theme, _kb, done) => {
 			const searchInput = new Input();
@@ -174,8 +140,6 @@ export default function modelPickerExtension(pi: ExtensionAPI) {
 
 				for (let i = startIndex; i < endIndex; i++) {
 					const row = rows[i];
-					if (!row) continue;
-
 					if (row.header) {
 						listContainer.addChild(new Text(theme.fg("dim", theme.bold(`── ${row.header} ──`)), 0, 0));
 						continue;
@@ -271,9 +235,7 @@ export default function modelPickerExtension(pi: ExtensionAPI) {
 
 	pi.registerCommand("pick", {
 		description: "Pick a model (favorites and recents shown first)",
-		handler: async (_args, ctx) => {
-			await showPicker(ctx);
-		},
+		handler: (_args, ctx) => showPicker(ctx),
 	});
 
 	pi.registerCommand("fav", {
@@ -297,8 +259,6 @@ export default function modelPickerExtension(pi: ExtensionAPI) {
 
 	pi.registerShortcut(Key.ctrlShift("m"), {
 		description: "Open model picker (favorites/recent first)",
-		handler: async (ctx) => {
-			await showPicker(ctx);
-		},
+		handler: (ctx) => showPicker(ctx),
 	});
 }

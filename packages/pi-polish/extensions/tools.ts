@@ -1,12 +1,3 @@
-/**
- * Claude-Code-style tool rendering. Consecutive bash/read/grep/find/ls calls collapse into one live
- * line ("Running 2 shell commands… · 3s" with the current command underneath) that settles into a
- * summary ("Ran 3 shell commands, read 2 files"). Edits and writes show their diff inline. The
- * app.tools.expand keybinding (ctrl+o) switches every row to full detail. Wraps pi's real built-in
- * tools via the exported createXToolDefinition factories, which also carry pi's prompt snippets and
- * guidelines (use read, not cat; edit, not sed); only the display changes.
- */
-
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import {
@@ -69,14 +60,15 @@ const FILE_TOOL_GUIDELINES: Record<string, string[]> = {
 function withGuidelines<T extends { promptGuidelines?: string[] }>(name: string, def: T): T {
 	return { ...def, promptGuidelines: [...(def.promptGuidelines ?? []), ...(FILE_TOOL_GUIDELINES[name] ?? [])] };
 }
+
 const DIFF_PREVIEW_LINES = 16;
 const ADDED_BG = "\x1b[48;2;13;46;16m";
 const REMOVED_BG = "\x1b[48;2;63;12;16m";
 const BG_RESET = "\x1b[49m";
-// Line numbers and +/- signs tinted to match their band, like Claude Code, instead of dim grey
 // Brighter bands for the words that changed within a replaced line
 const ADDED_WORD_BG = "\x1b[48;2;31;95;38m";
 const REMOVED_WORD_BG = "\x1b[48;2;122;30;36m";
+// Line numbers and +/- signs tinted to match their band, like Claude Code, instead of dim grey
 const ADDED_GUTTER = "\x1b[38;2;120;200;120m";
 const REMOVED_GUTTER = "\x1b[38;2;230;120;120m";
 const FG_RESET = "\x1b[39m";
@@ -382,6 +374,10 @@ class DiffView implements Component {
 	invalidate(): void {}
 }
 
+function lineCount(n: number): string {
+	return `${n} line${n === 1 ? "" : "s"}`;
+}
+
 function errorText(theme: any, text: string, expanded: boolean): Text {
 	const lines = text.trim().split("\n");
 	const body = expanded ? lines.join("\n    ") : lines[0] + (lines.length > 1 ? theme.fg("dim", `  (${keyHint("app.tools.expand", "details")})`) : "");
@@ -449,9 +445,9 @@ export default function (pi: ExtensionAPI) {
 		for (const invalidate of rowInvalidate.values()) invalidate();
 		// History rows were drawn before they were grouped; a full redraw clears their stale lines
 		if (ctx.hasUI) {
-			ctx.ui.setWidget("compact-tools-redraw", (tui) => {
+			ctx.ui.setWidget("pi-polish-redraw", (tui) => {
 				setTimeout(() => {
-					ctx.ui.setWidget("compact-tools-redraw", undefined);
+					ctx.ui.setWidget("pi-polish-redraw", undefined);
 					tui.requestRender(true);
 				}, 0);
 				return new Container();
@@ -547,51 +543,41 @@ export default function (pi: ExtensionAPI) {
 	groupedTool("find", createFindToolDefinition(cwd, {}));
 	groupedTool("ls", createLsToolDefinition(cwd, {}));
 
-	pi.registerTool({
-		...withGuidelines("edit", createEditToolDefinition(cwd, {})),
-		renderShell: "self",
-		renderCall(args: any, theme, context) {
-			return new Text(dot(theme, context) + theme.fg("toolTitle", `Update ${shortPath(args?.path, cwd)}`), 0, 0);
-		},
-		renderResult(result, { expanded, isError, isPartial }, theme, context) {
-			if (isPartial) return empty();
-			if (isError || context.isError) return errorText(theme, resultText(result as Result), expanded);
-			const diff = ((result.details as { diff?: string } | undefined)?.diff ?? "").split("\n").filter(Boolean);
-			const added = diff.filter((l) => l.startsWith("+")).length;
-			const removed = diff.filter((l) => l.startsWith("-")).length;
-			const stats = theme.fg("dim", `  └ Added ${added} line${added === 1 ? "" : "s"}, removed ${removed} line${removed === 1 ? "" : "s"}`);
-			const shown = expanded ? diff : diff.slice(0, DIFF_PREVIEW_LINES);
-			const more = diff.length - shown.length;
-			const footer = more > 0 ? theme.fg("dim", `    … +${more} lines (${keyHint("app.tools.expand", "expand")})`) : undefined;
-			const box = new Container();
-			box.addChild(new Text(stats, 0, 0));
-			box.addChild(new DiffView(shown, theme, footer, String((context.args as any)?.path ?? "")));
-			return box;
-		},
+	/** An edit or write row: "Update path" or "Write path", then a stats line and a diff preview. */
+	const fileTool = (verb: string, def: any, diffOf: (result: any, args: any) => [stats: string, lines: string[]]) => {
+		pi.registerTool({
+			...def,
+			renderShell: "self",
+			renderCall(args: any, theme, context) {
+				return new Text(dot(theme, context) + theme.fg("toolTitle", `${verb} ${shortPath(args?.path, cwd)}`), 0, 0);
+			},
+			renderResult(result, { expanded, isPartial }, theme, context) {
+				if (isPartial) return empty();
+				if (context.isError) return errorText(theme, resultText(result as Result), expanded);
+				const args = context.args as any;
+				const [stats, lines] = diffOf(result, args);
+				const shown = expanded ? lines : lines.slice(0, DIFF_PREVIEW_LINES);
+				const more = lines.length - shown.length;
+				const footer = more > 0 ? theme.fg("dim", `    … +${more} lines (${keyHint("app.tools.expand", "expand")})`) : undefined;
+				const box = new Container();
+				box.addChild(new Text(theme.fg("dim", `  └ ${stats}`), 0, 0));
+				box.addChild(new DiffView(shown, theme, footer, String(args?.path ?? "")));
+				return box;
+			},
+		});
+	};
+
+	fileTool("Update", withGuidelines("edit", createEditToolDefinition(cwd, {})), (result) => {
+		const diff = String(result.details?.diff ?? "").split("\n").filter(Boolean);
+		const added = diff.filter((l) => l.startsWith("+")).length;
+		const removed = diff.filter((l) => l.startsWith("-")).length;
+		return [`Added ${lineCount(added)}, removed ${lineCount(removed)}`, diff];
 	});
 
-	pi.registerTool({
-		...withGuidelines("write", createWriteToolDefinition(cwd, {})),
-		renderShell: "self",
-		renderCall(args: any, theme, context) {
-			return new Text(dot(theme, context) + theme.fg("toolTitle", `Write ${shortPath(args?.path, cwd)}`), 0, 0);
-		},
-		renderResult(result, { expanded, isError, isPartial }, theme, context) {
-			if (isPartial) return empty();
-			if (isError || context.isError) return errorText(theme, resultText(result as Result), expanded);
-			const content = String((context.args as any)?.content ?? "").replace(/\n$/, "");
-			const lines = content.split("\n");
-			const stats = theme.fg("dim", `  └ Wrote ${lines.length} line${lines.length === 1 ? "" : "s"}`);
-			// Show the new file as added lines, previewed like an edit's diff
-			const width = String(lines.length).length;
-			const added = lines.map((line, i) => `+${String(i + 1).padStart(width)} ${line}`);
-			const shown = expanded ? added : added.slice(0, DIFF_PREVIEW_LINES);
-			const more = added.length - shown.length;
-			const footer = more > 0 ? theme.fg("dim", `    … +${more} lines (${keyHint("app.tools.expand", "expand")})`) : undefined;
-			const box = new Container();
-			box.addChild(new Text(stats, 0, 0));
-			box.addChild(new DiffView(shown, theme, footer, String((context.args as any)?.path ?? "")));
-			return box;
-		},
+	// A new file shows as added lines, previewed like an edit's diff
+	fileTool("Write", withGuidelines("write", createWriteToolDefinition(cwd, {})), (_result, args) => {
+		const lines = String(args?.content ?? "").replace(/\n$/, "").split("\n");
+		const width = String(lines.length).length;
+		return [`Wrote ${lineCount(lines.length)}`, lines.map((line, i) => `+${String(i + 1).padStart(width)} ${line}`)];
 	});
 }

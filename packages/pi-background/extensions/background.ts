@@ -1,21 +1,14 @@
-/**
- * Background shell jobs: bg_run starts a command and returns at once; when it exits, a follow-up
- * message wakes the agent with the exit code and log tail. Uses pi's own shell runner, so jobs get
- * the same shell, env and sandbox as the bash tool, and die with the session.
- */
-
 import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createLocalBashOperations } from "@earendil-works/pi-coding-agent";
+import { createLocalBashOperations, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const TAIL_LINES = 20;
+const TAIL_BYTES = 64 * 1024;
 const BASH_DEFAULT_TIMEOUT = 120;
 const BASH_MAX_TIMEOUT = 600;
-const TAIL_BYTES = 64 * 1024;
 const WAKE_DEBOUNCE_MS = 1000;
 const MAX_WAKES = 10;
 
@@ -69,6 +62,9 @@ export default function (pi: ExtensionAPI) {
 	const ops = createLocalBashOperations();
 	let next = 1;
 
+	const wake = (content: string, details: { headline: string; last: string; error: boolean }) =>
+		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn: true, deliverAs: "followUp" });
+
 	// Wakes the agent with output lines matching pattern, batched per second and capped per job
 	const watcher = (job: Job, pattern: RegExp) => {
 		let partial = "";
@@ -81,15 +77,11 @@ export default function (pi: ExtensionAPI) {
 			if (job.status !== "running") return;
 			wakes++;
 			const capped = wakes === MAX_WAKES ? `\n(Reached ${MAX_WAKES} wake-ups; further matches are ignored, use bg_status to check.)` : "";
-			pi.sendMessage(
-				{
-					customType: "background-job",
-					content: `Background job ${job.id} output matched /${pattern.source}/ (still running):\n${pending.slice(-TAIL_LINES).join("\n")}${capped}`,
-					display: true,
-					details: { headline: `${job.id} matched /${pattern.source}/`, last: pending[pending.length - 1] ?? "", error: false },
-				},
-				{ triggerTurn: true, deliverAs: "followUp" },
-			);
+			wake(`Background job ${job.id} output matched /${pattern.source}/ (still running):\n${pending.slice(-TAIL_LINES).join("\n")}${capped}`, {
+				headline: `${job.id} matched /${pattern.source}/`,
+				last: pending[pending.length - 1] ?? "",
+				error: false,
+			});
 			pending = [];
 		};
 		return (data: Buffer) => {
@@ -189,19 +181,11 @@ export default function (pi: ExtensionAPI) {
 					out.end(() => {
 						// A kill from session shutdown has no session left to notify
 						if (job.status === "killed" && !jobs.has(id)) return;
-						pi.sendMessage(
-							{
-								customType: "background-job",
-								content: `Background job finished: ${summary(job)}\nLast lines:\n${tail(log, TAIL_LINES)}`,
-								display: true,
-								details: {
-									headline: `${id} ${job.status === "exited" ? `exited ${job.exitCode}` : job.status} · ${elapsed(job)}`,
-									last: tail(log, 1),
-									error: job.status !== "exited" || job.exitCode !== 0,
-								},
-							},
-							{ triggerTurn: true, deliverAs: "followUp" },
-						);
+						wake(`Background job finished: ${summary(job)}\nLast lines:\n${tail(log, TAIL_LINES)}`, {
+							headline: `${id} ${job.status === "exited" ? `exited ${job.exitCode}` : job.status} · ${elapsed(job)}`,
+							last: tail(log, 1),
+							error: job.status !== "exited" || job.exitCode !== 0,
+						});
 					});
 				});
 

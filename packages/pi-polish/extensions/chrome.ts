@@ -1,11 +1,3 @@
-/**
- * Claude-Code-style chrome: a ❯ prompt marker in the input editor, past prompts as a single
- * highlighted "❯ text" line, a ● before assistant replies, an orange working line that says what pi
- * is doing ("Running git status… (12s · ↓ 1.2k tokens)"), and no "Thinking..." placeholder while
- * thinking blocks are hidden (ctrl+t still reveals thinking).
- * Patches exported component prototypes, so it is guarded to fail soft if pi's internals change.
- */
-
 import { AssistantMessageComponent, CustomEditor, type ExtensionAPI, UserMessageComponent } from "@earendil-works/pi-coding-agent";
 import { Markdown } from "@earendil-works/pi-tui";
 
@@ -26,7 +18,7 @@ function markFirstLine(line: string, marker: string): string {
 
 function patchOnce(proto: any, method: string, wrap: (original: (...args: any[]) => any) => (...args: any[]) => any) {
 	if (!proto || typeof proto[method] !== "function" || proto[method][patched]) return;
-	const replacement = wrap(proto[method]);
+	const replacement: any = wrap(proto[method]);
 	replacement[patched] = true;
 	proto[method] = replacement;
 }
@@ -53,7 +45,7 @@ export default function (pi: ExtensionAPI) {
 						if (first >= 0) lines[first] = markFirstLine(lines[first], REPLY);
 						return lines;
 					};
-					child[patched] = true;
+					(child as any)[patched] = true;
 				}
 			},
 		);
@@ -71,7 +63,7 @@ export default function (pi: ExtensionAPI) {
 				if (lines.length < 3) return lines;
 				const strip = (l: string) => l.replace(OSC133_START, "").replace(OSC133_END, "");
 				const body = lines.slice(1, -1).map(strip);
-				body[0] = OSC133_START + markFirstLine(body[0], "\x1b[2m" + PROMPT + "\x1b[22m");
+				body[0] = OSC133_START + markFirstLine(body[0], `${DIM}${PROMPT}\x1b[22m`);
 				body[body.length - 1] = body[body.length - 1] + OSC133_END;
 				return body;
 			},
