@@ -4,7 +4,7 @@
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
-  "homepage": "https://github.com/pringled/pi-extensions#readme",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-statusbar#readme",
   "bugs": {
     "url": "https://github.com/pringled/pi-extensions/issues"
   },
@@ -30,7 +30,8 @@
   "pi": {
     "extensions": [
       "./extensions/statusbar.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-statusbar-dark.gif"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

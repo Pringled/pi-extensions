@@ -1,23 +1,28 @@
 # pi-polish
 
-Claude Code-style tool rows and diffs for [pi](https://pi.dev). Only the display changes; every tool runs exactly as it does in pi.
+Makes [pi](https://pi.dev)'s output look like Claude Code's: tool calls fold into short summary lines, and edits show as colored diffs.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-polish-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-polish-light.gif" alt="pi-polish demo">
+</picture>
 
 ```bash
 pi install npm:pi-polish
 ```
 
-pi-polish patches some of pi's internal UI components, so a new pi release can break parts of the look until pi-polish is updated. Your tools and sessions are never affected; at worst the display looks off or falls back to pi's default. Last tested with pi 1.3.
-
 ## Features
 
-- Consecutive `bash`, `read`, `grep`, `find` and `ls` calls fold into one live line (`Running 2 shell commands… · 5s`) that settles into a summary (`Ran 3 shell commands, read 2 files`).
-- Edits show as diffs on red and green bands, highlighted with [Shiki](https://shiki.style) in VS Code Dark+ or Light+ colors to match your pi theme, with the changed words marked. New files show a preview of their first lines.
-- The `●` before each row is green when it finished, red when it failed and orange while it runs.
-- An orange working line says what pi is doing, for example `✶ Running git status… (12s · ↓ 1.2k tokens)`.
-- `❯` before the input and past prompts, `●` before replies, and no `Thinking...` placeholders while thinking is hidden.
-- Prompt guidelines that steer models to pi's `write` and `edit` tools instead of `cat <<EOF` or `sed -i`, so file changes show as diffs.
+- Shell commands, file reads and searches in a row fold into one line that updates while they run (`Running 2 shell commands… · 5s`) and then sums them up (`Ran 3 shell commands, read 2 files`). `ctrl+o` shows the full output.
+- Edits and new files show as diffs with syntax highlighting and the changed words marked, in colors that follow your pi theme, dark or light.
+- A dot on each tool row shows its status: orange while running, green when done, red if it failed.
+- An orange status line shows what pi is doing, how long it has been at it and how many tokens it has written.
+- `❯` marks your messages and `●` marks pi's replies.
+- A short instruction to the model to change files with pi's edit and write tools instead of shell commands like `sed -i`, so you see the changes as diffs.
 
-`ctrl+o` switches every row back to full detail.
+## Compatibility
+
+pi-polish only changes how pi's built-in tools are drawn; the tools themselves run exactly as before. The chat styling (the markers and the status line) reaches into pi's internal UI, so a new pi release can break that part of the look until pi-polish is updated. Your sessions are never affected. Tested with pi 1.3.
 
 ## License
 

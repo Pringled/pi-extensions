@@ -1,24 +1,27 @@
 # pi-background
 
-Background jobs for [pi](https://pi.dev) that wake the agent when they finish or print what it is waiting for, plus a bash timeout so pi doesn't hang on a command.
+Lets [pi](https://pi.dev) run long commands in the background instead of waiting on them. pi starts the job, carries on or hands back to you, and gets a message when the job finishes or prints something it's waiting for.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-background-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-background-light.gif" alt="pi-background demo">
+</picture>
 
 ```bash
 pi install npm:pi-background
 ```
 
+## Features
+
+- Long commands like downloads, builds, test suites and training runs go to the background, and pi hears back with the exit code and the end of the output when they finish.
+- pi can wait for a specific line, such as a dev server's `listening on` or a training run's `epoch 3`, without checking again and again.
+- Regular commands time out after 2 minutes, unless pi asks for longer (up to 10), so pi never hangs on a stuck command. Commands that start their own background process with `&` are left alone.
+
+You don't need to do anything differently: pi decides when a job belongs in the background. You can also ask for it, for example "run the tests in the background and tell me when they're done".
+
 ## Tools
 
-- **`bg_run`** starts a shell command in the background and returns a job id. When the job exits, pi gets the exit code and the last log lines. With `wake_on` (a regex), pi is also woken while the job runs whenever an output line matches, such as `listening on` for a dev server or `epoch \d+` for a training run.
-- **`bg_status`** lists jobs, or shows one job's state and log tail.
-- **`bg_kill`** stops a job and its child processes.
-
-Jobs run through pi's own shell, with the same environment and sandbox as `bash`, and stop when the session ends.
-
-## Bash timeout
-
-Foreground `bash` commands time out after 2 minutes by default, raisable to 10 minutes per command. A command that starts a background job with `&` is never timed out, because a timeout kills the command's whole process group, including that job.
-
-The extension also tells the model to use `bg_run` for downloads, heavy installs, builds, full test suites, training runs and anything that waits or polls, and to keep quick commands in `bash`.
+pi gets three tools for this: `bg_run` starts a job, `bg_status` shows how it's doing and its latest output, and `bg_kill` stops it. Jobs run with the same environment and sandbox as pi's own shell commands, and stop when you close pi.
 
 ## License
 

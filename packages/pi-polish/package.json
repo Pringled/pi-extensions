@@ -4,7 +4,7 @@
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
-  "homepage": "https://github.com/pringled/pi-extensions#readme",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-polish#readme",
   "bugs": {
     "url": "https://github.com/pringled/pi-extensions/issues"
   },
@@ -31,7 +31,8 @@
     "extensions": [
       "./extensions/tools.ts",
       "./extensions/chrome.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-polish-dark.gif"
   },
   "dependencies": {
     "diff": "9.0.0",
