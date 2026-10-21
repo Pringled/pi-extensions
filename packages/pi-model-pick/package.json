@@ -4,7 +4,7 @@
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
-  "homepage": "https://github.com/pringled/pi-extensions#readme",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-model-pick#readme",
   "bugs": {
     "url": "https://github.com/pringled/pi-extensions/issues"
   },
@@ -29,7 +29,8 @@
   "pi": {
     "extensions": [
       "./extensions/model-pick.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-dark.gif"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

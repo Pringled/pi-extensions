@@ -1,6 +1,11 @@
 # pi-model-pick
 
-A model picker for [pi](https://pi.dev) with your favorite and recently used models at the top.
+A model picker for [pi](https://pi.dev) with your favorite and recently used models at the top. pi's own `/model` shows every model from every provider in one long list; this one puts the ones you use first.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-light.gif" alt="pi-model-pick demo">
+</picture>
 
 ```bash
 pi install npm:pi-model-pick
