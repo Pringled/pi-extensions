@@ -8,12 +8,12 @@ pi install npm:pi-statusbar
 
 ## What it shows
 
-- `provider/model` of the current model.
+- The current model, as `provider/model`, and its thinking level.
 - The git branch, or `no git` outside a repository.
 - A context bar with used and total tokens. It turns yellow at 50% and red at 80%.
 - The total cost of the session so far.
 
-It replaces pi's default footer, which also shows the working folder and token and cache counts.
+It replaces pi's default footer.
 
 ## License
 
