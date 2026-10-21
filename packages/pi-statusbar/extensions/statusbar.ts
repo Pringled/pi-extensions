@@ -11,8 +11,12 @@ function fmtTokens(n: number): string {
 }
 
 export default function (pi: ExtensionAPI) {
+	let redraw = () => {};
+	pi.on("thinking_level_select", async () => redraw());
+
 	pi.on("session_start", async (_event, ctx) => {
 		ctx.ui.setFooter((tui, theme, footerData) => {
+			redraw = () => tui.requestRender();
 			const unsub = footerData.onBranchChange(() => tui.requestRender());
 
 			return {
@@ -38,7 +42,9 @@ export default function (pi: ExtensionAPI) {
 
 					const branch = footerData.getGitBranch();
 					const branchSeg = theme.fg("mdLink", branch ? `⎇ ${branch}` : "no git");
-					const modelSeg = theme.fg("accent", `${ctx.model?.provider ?? "?"}/${ctx.model?.id ?? "none"}`);
+					// The thinking level only means something for models that can think
+					const thinking = ctx.model?.reasoning ? theme.fg("muted", ` · ${pi.getThinkingLevel()}`) : "";
+					const modelSeg = theme.fg("accent", `${ctx.model?.provider ?? "?"}/${ctx.model?.id ?? "none"}`) + thinking;
 					const contextSeg =
 						theme.fg("muted", "Context: [") +
 						bar +
