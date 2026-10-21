@@ -1,0 +1,40 @@
+{
+  "name": "pi-statusbar",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Thomas van Dongen",
+  "type": "module",
+  "homepage": "https://github.com/pringled/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/pringled/pi-extensions/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "description": "A one-line pi footer with the model, git branch, a context bar and the session cost",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "statusline",
+    "footer",
+    "context"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pringled/pi-extensions.git",
+    "directory": "packages/pi-statusbar"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/statusbar.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}
