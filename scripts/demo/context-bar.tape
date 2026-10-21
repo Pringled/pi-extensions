@@ -1,4 +1,4 @@
-Output "assets/images/pi-statusbar-dark.gif"
+Output "assets/images/pi-context-bar-dark.gif"
 
 Source "scripts/demo/style-dark.tape"
 Set Height 400
