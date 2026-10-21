@@ -1,6 +1,6 @@
 {
   "name": "pi-polish",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "Claude Code-style polish for pi: folded tool rows with live status, syntax-highlighted diffs with word-level changes, and a ❯/● chat style",
+  "description": "Claude Code-style output for pi: tool calls fold into short summaries and edits show as colored diffs",
   "keywords": [
     "pi-package",
     "pi",
