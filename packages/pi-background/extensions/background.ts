@@ -47,6 +47,12 @@ function startsBackgroundJob(command: string): boolean {
 	return /&/.test(command.replace(/&&|[0-9]*>&[0-9-]*|&>>?|\|&/g, ""));
 }
 
+/** Compiles wake_on, accepting Python's (?i) prefix that models often write but JavaScript only takes as a flag. */
+function wakePattern(source: string): RegExp {
+	const insensitive = source.startsWith("(?i)");
+	return new RegExp(insensitive ? source.slice(4) : source, insensitive ? "i" : "");
+}
+
 export default function (pi: ExtensionAPI) {
 	// Pi's bash has no default timeout, so a stuck or polling command blocks until interrupted; cap it like Claude Code
 	// does. A timeout SIGKILLs the command's whole process group, which would include jobs it started with &, so a
@@ -152,7 +158,7 @@ export default function (pi: ExtensionAPI) {
 			),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			const pattern = params.wake_on ? new RegExp(params.wake_on) : undefined;
+			const pattern = params.wake_on ? wakePattern(params.wake_on) : undefined;
 			const id = `bg${next++}`;
 			const dir = join(tmpdir(), "pi-bg");
 			mkdirSync(dir, { recursive: true });

@@ -122,7 +122,9 @@ export default function (pi: ExtensionAPI) {
 		}
 		rebuild();
 
-		const result = await ctx.ui.custom<string | null>((_tui, theme, _kb, done) => {
+		let redraw = () => {};
+		const result = await ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
+			redraw = () => tui.requestRender();
 			const searchInput = new Input();
 			searchInput.focused = true;
 			const listContainer = new Container();
@@ -228,6 +230,8 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		const success = await pi.setModel(model);
+		// The footer shows the model but only redraws on the next render
+		redraw();
 		if (!success) {
 			ctx.ui.notify(`No API key configured for ${result}`, "error");
 		}
