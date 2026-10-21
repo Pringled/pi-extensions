@@ -6,7 +6,7 @@ My extensions for the [pi](https://pi.dev) coding agent. Each package installs o
 | --- | --- |
 | [`pi-polish`](packages/pi-polish) | Claude Code-style tool rows and diffs. |
 | [`pi-background`](packages/pi-background) | Background jobs that wake pi when they finish, and a bash timeout so pi doesn't hang. |
-| [`pi-model-pick`](packages/pi-model-pick) | A model picker with favourite and recent models first. |
+| [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. |
 
 ```bash
 pi install npm:pi-polish

@@ -68,7 +68,7 @@ const BG_RESET = "\x1b[49m";
 // Brighter bands for the words that changed within a replaced line
 const ADDED_WORD_BG = "\x1b[48;2;31;95;38m";
 const REMOVED_WORD_BG = "\x1b[48;2;122;30;36m";
-// Line numbers and +/- signs tinted to match their band, like Claude Code, instead of dim grey
+// Line numbers and +/- signs tinted to match their band, like Claude Code, instead of dim gray
 const ADDED_GUTTER = "\x1b[38;2;120;200;120m";
 const REMOVED_GUTTER = "\x1b[38;2;230;120;120m";
 const FG_RESET = "\x1b[39m";
@@ -146,7 +146,7 @@ function expandedBody(theme: any, text: string, maxLines = 60): string {
 }
 
 // Shiki (TextMate grammars, as in VS Code) with Dark+ to match Neovim's vscode.nvim. Dark+ leaves Python calls and
-// attributes uncoloured because VS Code gets those from Pylance; these rules colour them like tree-sitter does.
+// attributes uncolored because VS Code gets those from Pylance; these rules color them like tree-sitter does.
 // C++ is left out: its grammar takes ~0.5s to compile on first use and would freeze the screen; pi's highlighter covers it.
 const SHIKI_LANGS = [bash, css, c, diff, docker, go, html, ini, java, javascript, json, jsonc, jsx, lua, make, markdown, python, rust, sql, toml, tsx, typescript, xml, yaml];
 const EXT_TO_LANG: Record<string, string> = {
@@ -170,7 +170,7 @@ let shiki: HighlighterCore | undefined;
 
 /** Slightly brighter and more saturated than stock Dark+, which reads as muddy on the terminal background. */
 function brighten(hex: string): [number, number, number] {
-	// Plain code text is Dark+'s grey foreground; saturation can't lift a grey, so it maps straight to near-white
+	// Plain code text is Dark+'s gray foreground; saturation can't lift a gray, so it maps straight to near-white
 	if (hex.toUpperCase().startsWith("#D4D4D4")) return [238, 238, 238];
 	const n = Number.parseInt(hex.slice(1, 7), 16);
 	let [r, g, b] = [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
@@ -186,7 +186,7 @@ function brighten(hex: string): [number, number, number] {
 		h /= 6;
 	}
 	s = Math.min(1, s * 1.4);
-	// Lightening an already light colour (function yellow, variable blue) washes it out to near-white, so only darker ones get it
+	// Lightening an already light color (function yellow, variable blue) washes it out to near-white, so only darker ones get it
 	if (l < 0.65) l = Math.min(0.72, l * 1.12);
 	const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
 	const p = 2 * l - q;
@@ -203,7 +203,7 @@ const TYPE_FG = "#4EC9B0";
 const VARIABLE_FG = "#9CDCFE";
 const PY_BUILTIN_TYPES = new Set(["bool", "bytearray", "bytes", "complex", "dict", "float", "frozenset", "int", "list", "object", "set", "str", "tuple", "type"]);
 
-/** Imported module names and aliases, from the snippet and the file on disk, so they can be coloured as modules. */
+/** Imported module names and aliases, from the snippet and the file on disk, so they can be colored as modules. */
 function pythonModules(code: string, path: string): Set<string> {
 	let source = code;
 	try {
@@ -236,7 +236,7 @@ function shikiLines(code: string, path: string): string[] | undefined {
 			line
 				.map((t) => {
 					const color = t.color ?? DEFAULT_FG;
-					// Python names the grammar leaves unscoped: colour them like Neovim's tree-sitter + LSP does
+					// Python names the grammar leaves unscoped: color them like Neovim's tree-sitter + LSP does
 					if (modules && color.toUpperCase().startsWith(DEFAULT_FG)) {
 						return t.content.replace(/[A-Za-z_]\w*|[^A-Za-z_]+/g, (part) => {
 							if (!/^[A-Za-z_]/.test(part)) return paint(DEFAULT_FG, part);
@@ -282,7 +282,7 @@ function changedSpans(before: string, after: string): [Span[], Span[]] | undefin
 	return [removed, added];
 }
 
-/** Puts a background on the given visible column spans of an ANSI-coloured line, surviving colour resets inside them. */
+/** Puts a background on the given visible column spans of an ANSI-colored line, surviving color resets inside them. */
 function withBackground(line: string, spans: Span[], on: string, off: string): string {
 	const marked = (col: number) => spans.some(([start, end]) => col >= start && col < end);
 	let out = "";
@@ -308,7 +308,7 @@ function withBackground(line: string, spans: Span[], on: string, off: string): s
 
 /**
  * Renders pi's "+12 text" / "-12 text" / " 12 text" diff lines with syntax highlighting, added and
- * removed lines as full-width coloured bands.
+ * removed lines as full-width colored bands.
  */
 class DiffView implements Component {
 	private highlighted: string[];
@@ -319,7 +319,7 @@ class DiffView implements Component {
 		private footer?: string,
 		path = "",
 	) {
-		// Highlight all bodies as one snippet so multi-line strings and docstrings colour correctly
+		// Highlight all bodies as one snippet so multi-line strings and docstrings color correctly
 		const bodies = lines.map((line) => (/^[+\- ]\s*\d*\s(.*)$/.exec(line)?.[1] ?? line.slice(1)).replace(/\t/g, "    "));
 		let highlighted: string[] = [];
 		try {
