@@ -539,9 +539,10 @@ export default function (pi: ExtensionAPI) {
 
 	groupedTool("bash", createBashToolDefinition(cwd, {}));
 	groupedTool("read", withGuidelines("read", createReadToolDefinition(cwd, {})));
-	groupedTool("grep", createGrepToolDefinition(cwd, {}));
-	groupedTool("find", createFindToolDefinition(cwd, {}));
-	groupedTool("ls", createLsToolDefinition(cwd, {}));
+	// pi leaves these off unless the user enables them, so registering them here must not switch them on
+	groupedTool("grep", { ...createGrepToolDefinition(cwd, {}), defaultActive: false });
+	groupedTool("find", { ...createFindToolDefinition(cwd, {}), defaultActive: false });
+	groupedTool("ls", { ...createLsToolDefinition(cwd, {}), defaultActive: false });
 
 	/** An edit or write row: "Update path" or "Write path", then a stats line and a diff preview. */
 	const fileTool = (verb: string, def: any, diffOf: (result: any, args: any) => [stats: string, lines: string[]]) => {
