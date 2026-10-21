@@ -22,7 +22,6 @@ pi-polish patches some of pi's internal UI components, so a new pi release can b
 ## Notes
 
 - Tuned for dark themes.
-- Re-registers `bash`, `read`, `edit`, `write`, `grep`, `find` and `ls` for their rendering, so it conflicts with other packages that do the same.
 
 ## License
 

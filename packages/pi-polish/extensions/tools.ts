@@ -1,17 +1,11 @@
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import {
-	createBashToolDefinition,
-	createEditToolDefinition,
-	createFindToolDefinition,
-	createGrepToolDefinition,
-	createLsToolDefinition,
-	createReadToolDefinition,
-	createWriteToolDefinition,
 	getLanguageFromPath,
 	highlightCode,
 	keyHint,
 	type ExtensionAPI,
+	type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import bash from "@shikijs/langs/shellscript";
@@ -56,10 +50,6 @@ const FILE_TOOL_GUIDELINES: Record<string, string[]> = {
 		"write creates missing parent directories itself, so call it directly instead of combining mkdir -p with a heredoc in bash.",
 	],
 };
-
-function withGuidelines<T extends { promptGuidelines?: string[] }>(name: string, def: T): T {
-	return { ...def, promptGuidelines: [...(def.promptGuidelines ?? []), ...(FILE_TOOL_GUIDELINES[name] ?? [])] };
-}
 
 const DIFF_PREVIEW_LINES = 16;
 const ADDED_BG = "\x1b[48;2;13;46;16m";
@@ -520,65 +510,66 @@ export default function (pi: ExtensionAPI) {
 		return theme.fg("success", `${MARK} `);
 	};
 
-	const groupedTool = (toolName: string, def: any) => {
-		pi.registerTool({
-			...def,
-			renderShell: "self",
-			renderCall(args: any, theme, context) {
-				const grouped = renderGrouped(context.toolCallId, theme, context);
-				if (grouped) return grouped;
-				const text = truncateToWidth(label(toolName, args, cwd), 400);
-				return new Text(dot(theme, context) + theme.fg("toolTitle", text), 0, 0);
-			},
-			renderResult(result, { expanded }, theme) {
-				if (!expanded) return empty();
-				return new Text(expandedBody(theme, resultText(result as Result)), 0, 0);
-			},
-		});
-	};
-
-	groupedTool("bash", createBashToolDefinition(cwd, {}));
-	groupedTool("read", withGuidelines("read", createReadToolDefinition(cwd, {})));
-	// pi leaves these off unless the user enables them, so registering them here must not switch them on
-	groupedTool("grep", { ...createGrepToolDefinition(cwd, {}), defaultActive: false });
-	groupedTool("find", { ...createFindToolDefinition(cwd, {}), defaultActive: false });
-	groupedTool("ls", { ...createLsToolDefinition(cwd, {}), defaultActive: false });
-
-	/** An edit or write row: "Update path" or "Write path", then a stats line and a diff preview. */
-	const fileTool = (verb: string, def: any, diffOf: (result: any, args: any) => [stats: string, lines: string[]]) => {
-		pi.registerTool({
-			...def,
-			renderShell: "self",
-			renderCall(args: any, theme, context) {
-				return new Text(dot(theme, context) + theme.fg("toolTitle", `${verb} ${shortPath(args?.path, cwd)}`), 0, 0);
-			},
-			renderResult(result, { expanded, isPartial }, theme, context) {
-				if (isPartial) return empty();
-				if (context.isError) return errorText(theme, resultText(result as Result), expanded);
-				const args = context.args as any;
-				const [stats, lines] = diffOf(result, args);
-				const shown = expanded ? lines : lines.slice(0, DIFF_PREVIEW_LINES);
-				const more = lines.length - shown.length;
-				const footer = more > 0 ? theme.fg("dim", `    … +${more} lines (${keyHint("app.tools.expand", "expand")})`) : undefined;
-				const box = new Container();
-				box.addChild(new Text(theme.fg("dim", `  └ ${stats}`), 0, 0));
-				box.addChild(new DiffView(shown, theme, footer, String(args?.path ?? "")));
-				return box;
-			},
-		});
-	};
-
-	fileTool("Update", withGuidelines("edit", createEditToolDefinition(cwd, {})), (result) => {
-		const diff = String(result.details?.diff ?? "").split("\n").filter(Boolean);
-		const added = diff.filter((l) => l.startsWith("+")).length;
-		const removed = diff.filter((l) => l.startsWith("-")).length;
-		return [`Added ${lineCount(added)}, removed ${lineCount(removed)}`, diff];
+	const groupedTool = (toolName: string): ToolRenderers => ({
+		renderShell: "self",
+		renderCall(args: any, theme, context) {
+			const grouped = renderGrouped(context.toolCallId, theme, context);
+			if (grouped) return grouped;
+			const text = truncateToWidth(label(toolName, args, cwd), 400);
+			return new Text(dot(theme, context) + theme.fg("toolTitle", text), 0, 0);
+		},
+		renderResult(result, { expanded }, theme) {
+			if (!expanded) return empty();
+			return new Text(expandedBody(theme, resultText(result as Result)), 0, 0);
+		},
 	});
 
-	// A new file shows as added lines, previewed like an edit's diff
-	fileTool("Write", withGuidelines("write", createWriteToolDefinition(cwd, {})), (_result, args) => {
-		const lines = String(args?.content ?? "").replace(/\n$/, "").split("\n");
-		const width = String(lines.length).length;
-		return [`Wrote ${lineCount(lines.length)}`, lines.map((line, i) => `+${String(i + 1).padStart(width)} ${line}`)];
+	/** An edit or write row: "Update path" or "Write path", then a stats line and a diff preview. */
+	const fileTool = (verb: string, diffOf: (result: any, args: any) => [stats: string, lines: string[]]): ToolRenderers => ({
+		renderShell: "self",
+		renderCall(args: any, theme, context) {
+			return new Text(dot(theme, context) + theme.fg("toolTitle", `${verb} ${shortPath(args?.path, cwd)}`), 0, 0);
+		},
+		renderResult(result, { expanded, isPartial }, theme, context) {
+			if (isPartial) return empty();
+			if (context.isError) return errorText(theme, resultText(result as Result), expanded);
+			const args = context.args as any;
+			const [stats, lines] = diffOf(result, args);
+			const shown = expanded ? lines : lines.slice(0, DIFF_PREVIEW_LINES);
+			const more = lines.length - shown.length;
+			const footer = more > 0 ? theme.fg("dim", `    … +${more} lines (${keyHint("app.tools.expand", "expand")})`) : undefined;
+			const box = new Container();
+			box.addChild(new Text(theme.fg("dim", `  └ ${stats}`), 0, 0));
+			box.addChild(new DiffView(shown, theme, footer, String(args?.path ?? "")));
+			return box;
+		},
+	});
+
+	const renderers: Record<string, ToolRenderers> = {
+		bash: groupedTool("bash"),
+		read: groupedTool("read"),
+		grep: groupedTool("grep"),
+		find: groupedTool("find"),
+		ls: groupedTool("ls"),
+		edit: fileTool("Update", (result) => {
+			const diff = String(result.details?.diff ?? "").split("\n").filter(Boolean);
+			const added = diff.filter((l) => l.startsWith("+")).length;
+			const removed = diff.filter((l) => l.startsWith("-")).length;
+			return [`Added ${lineCount(added)}, removed ${lineCount(removed)}`, diff];
+		}),
+		// A new file shows as added lines, previewed like an edit's diff
+		write: fileTool("Write", (_result, args) => {
+			const lines = String(args?.content ?? "").replace(/\n$/, "").split("\n");
+			const width = String(lines.length).length;
+			return [`Wrote ${lineCount(lines.length)}`, lines.map((line, i) => `+${String(i + 1).padStart(width)} ${line}`)];
+		}),
+	};
+	// Only the drawing changes: pi's own tools keep running, with their own schema and on/off state
+	pi.registerToolRenderer((toolName, next) => renderers[toolName] ?? next());
+
+	// pi only lists a tool's guidelines while the tool is on
+	pi.on("before_agent_start", async (event) => {
+		const guidelines = event.systemPromptOptions.toolGuidelines;
+		for (const [name, rules] of Object.entries(FILE_TOOL_GUIDELINES)) guidelines[name] = [...(guidelines[name] ?? []), ...rules];
 	});
 }
