@@ -1,6 +1,6 @@
 {
   "name": "pi-background",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "Background jobs for pi that wake the agent when they finish or print what it waits for, plus a bash timeout that never kills background work, so pi doesn't hang on a command",
+  "description": "Lets pi run long commands in the background and wakes it when they finish, so it never blocks or hangs",
   "keywords": [
     "pi-package",
     "pi",

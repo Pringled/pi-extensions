@@ -1,14 +1,14 @@
-# pi-statusbar
+# pi-context-bar
 
 A one-line footer for [pi](https://pi.dev), styled after [ccstatusline](https://github.com/sirmalloc/ccstatusline): the model, git branch, a context bar and the session cost.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-statusbar-dark.gif">
-  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-statusbar-light.gif" alt="pi-statusbar">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-context-bar-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-context-bar-light.gif" alt="pi-context-bar">
 </picture>
 
 ```bash
-pi install npm:pi-statusbar
+pi install npm:pi-context-bar
 ```
 
 ## What it shows

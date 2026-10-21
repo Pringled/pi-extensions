@@ -1,10 +1,10 @@
 {
-  "name": "pi-statusbar",
+  "name": "pi-context-bar",
   "version": "0.1.0",
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
-  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-statusbar#readme",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-context-bar#readme",
   "bugs": {
     "url": "https://github.com/pringled/pi-extensions/issues"
   },
@@ -25,13 +25,13 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pringled/pi-extensions.git",
-    "directory": "packages/pi-statusbar"
+    "directory": "packages/pi-context-bar"
   },
   "pi": {
     "extensions": [
-      "./extensions/statusbar.ts"
+      "./extensions/context-bar.ts"
     ],
-    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-statusbar-dark.gif"
+    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-context-bar-dark.gif"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

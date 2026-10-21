@@ -1,6 +1,6 @@
 {
   "name": "pi-model-pick",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "A model picker for pi with favorites and recently used models instead of one long flat list",
+  "description": "A model picker for pi that puts your favorite and recently used models first",
   "keywords": [
     "pi-package",
     "pi",
