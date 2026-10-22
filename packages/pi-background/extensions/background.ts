@@ -107,11 +107,11 @@ export default function (pi: ExtensionAPI) {
 	// One line per running job above the input, with its elapsed time and latest output
 	let ui: ExtensionContext["ui"] | undefined;
 	const running = () => [...jobs.values()].filter((job) => job.status === "running");
-	// Turned off with "background": { "showJobs": false } in pi's settings.json
-	const enabled = () => (pi.getSettings() as { background?: { showJobs?: boolean } }).background?.showJobs !== false;
+	// "full" (the default), "compact" without the output, or "off", set with "background": { "jobs": ... } in pi's settings.json
+	const jobsLine = () => (pi.getSettings() as { background?: { jobs?: string } }).background?.jobs ?? "full";
 	const showJobs = () => {
 		if (!ui) return;
-		if (!enabled() || running().length === 0) return ui.setWidget("background-jobs", undefined);
+		if (jobsLine() === "off" || running().length === 0) return ui.setWidget("background-jobs", undefined);
 		ui.setWidget("background-jobs", (tui, theme) => {
 			const timer = setInterval(() => tui.requestRender(), 1000);
 			return {
@@ -124,7 +124,7 @@ export default function (pi: ExtensionAPI) {
 						const text =
 							theme.fg("accent", " ⏵ ") +
 							theme.fg("toolTitle", `${job.id} ${command.length > 40 ? `${command.slice(0, 39)}…` : command}`) +
-							theme.fg("dim", ` · ${elapsed(job)}${job.lastLine ? ` · ${job.lastLine}` : ""}`);
+							theme.fg("dim", ` · ${elapsed(job)}${jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : ""}`);
 						return truncateToWidth(text, width);
 					});
 					if (live.length > MAX_SHOWN_JOBS) lines.push(theme.fg("dim", `   and ${live.length - MAX_SHOWN_JOBS} more`));
