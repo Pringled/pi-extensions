@@ -1,0 +1,41 @@
+{
+  "name": "pi-next-prompt",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Thomas van Dongen",
+  "type": "module",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-next-prompt#readme",
+  "bugs": {
+    "url": "https://github.com/pringled/pi-extensions/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "description": "Suggests your next prompt in grey after each reply; Tab takes it",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "suggestions",
+    "autocomplete",
+    "prompt"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pringled/pi-extensions.git",
+    "directory": "packages/pi-next-prompt"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/next-prompt.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-next-prompt-dark.gif"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}

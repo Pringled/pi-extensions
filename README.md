@@ -16,6 +16,7 @@ My extensions for the [pi](https://pi.dev) coding agent. Most of these are inspi
 | [`pi-model-pick`](packages/pi-model-pick)   | A model picker with favorite and recent models first.            | [npm](https://www.npmjs.com/package/pi-model-pick)  |
 | [`pi-context-bar`](packages/pi-context-bar) | A one-line footer with the model, branch, context bar and cost.  | [npm](https://www.npmjs.com/package/pi-context-bar) |
 | [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files pi edited along with the conversation.          | [npm](https://www.npmjs.com/package/pi-checkpoints) |
+| [`pi-next-prompt`](packages/pi-next-prompt) | Suggests your next prompt in grey after each reply.              | [npm](https://www.npmjs.com/package/pi-next-prompt) |
 
 ```bash
 pi install npm:pi-polish
@@ -23,6 +24,7 @@ pi install npm:pi-background
 pi install npm:pi-model-pick
 pi install npm:pi-context-bar
 pi install npm:pi-checkpoints
+pi install npm:pi-next-prompt
 ```
 
 ## Author
