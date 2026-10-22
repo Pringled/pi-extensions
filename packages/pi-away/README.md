@@ -1,6 +1,6 @@
 # pi-away
 
-A one-line recap of where things stand when you come back to [pi](https://pi.dev), like Claude Code's session recap. Start a long task, walk away, and find this above the input when you're back:
+A one-line recap of where things stand when you come back to [pi](https://pi.dev). Start a long task, walk away, and find this above the input when you're back:
 
 ```
 ※ recap: Fixed the off-by-one bug in stats.py's mean() and added median() with tests; all 4 tests pass. Still to decide: how empty lists should be handled.

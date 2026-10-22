@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "A one-line recap of where the session stands when you come back to pi, like Claude Code, plus /recap",
+  "description": "A one-line recap of where the session stands when you come back to pi, plus /recap",
   "keywords": [
     "pi-package",
     "pi",
