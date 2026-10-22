@@ -1,6 +1,6 @@
 # pi-next-prompt
 
-Suggests what you'll probably ask [pi](https://pi.dev) next, like Claude Code does. When pi finishes a reply, a suggestion shows up in grey in the empty input, such as "Go ahead and fix it, then run the tests."
+Suggests what you'll probably ask [pi](https://pi.dev) next. When pi finishes a reply, a suggestion shows up in grey in the empty input, such as "Go ahead and fix it, then run the tests."
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-next-prompt-dark.gif">

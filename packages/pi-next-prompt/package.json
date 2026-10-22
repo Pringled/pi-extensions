@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "Suggests your next prompt in grey after each reply, like Claude Code; Tab takes it",
+  "description": "Suggests your next prompt in grey after each reply; Tab takes it",
   "keywords": [
     "pi-package",
     "pi",
