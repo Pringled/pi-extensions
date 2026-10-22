@@ -45,6 +45,14 @@ function summary(job: Job): string {
 	return `${job.id} [${state}, ${elapsed(job)}] ${job.command}\n  log: ${job.log}`;
 }
 
+/** The part of a command worth showing: its first line, without a leading cd and with a script path shortened to its name. */
+function shownCommand(command: string): string {
+	return command
+		.split("\n")[0]
+		.replace(/^\s*(cd\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*)+/, "")
+		.replace(/^\S*\/(?=[^\s/]+(\s|$))/, "");
+}
+
 /** True when a command starts a job with a bare & (not &&, 2>&1, &> or |&). */
 function startsBackgroundJob(command: string): boolean {
 	return /&/.test(command.replace(/&&|[0-9]*>&[0-9-]*|&>>?|\|&/g, ""));
@@ -120,10 +128,10 @@ export default function (pi: ExtensionAPI) {
 				render(width: number) {
 					const live = running();
 					const lines = live.slice(0, MAX_SHOWN_JOBS).map((job) => {
-						const command = job.command.split("\n")[0];
+						const command = shownCommand(job.command);
 						const text =
 							theme.fg("accent", " ⏵ ") +
-							theme.fg("toolTitle", `${job.id} ${command.length > 40 ? `${command.slice(0, 39)}…` : command}`) +
+							theme.fg("toolTitle", `${job.id} ${command.length > 50 ? `${command.slice(0, 49)}…` : command}`) +
 							theme.fg("dim", ` · ${elapsed(job)}${jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : ""}`);
 						return truncateToWidth(text, width);
 					});
@@ -173,6 +181,7 @@ export default function (pi: ExtensionAPI) {
 			"After bg_run, continue with independent work or end your turn; a message with the exit code and log tail arrives automatically when the job exits, so never sleep, poll or tail the log to wait for it.",
 			"Keep using bash for quick commands whose output you need right away, such as git, ls, cat, grep, find, file inspection and short checks.",
 			"To react when a bg_run job prints something specific while it keeps running (a server is ready, an epoch finished, an error appeared), pass wake_on with a regex instead of polling.",
+			"Don't redirect a bg_run command's output to a file (> file, 2>&1, nohup): bg_run already saves all of it to the job's log, and redirecting hides the job's progress from the user and from wake_on. If the output should be kept, tell the user where the job's log is.",
 			"Use bg_status to check progress of a bg_run job and bg_kill to stop one.",
 			`bash commands time out after ${BASH_DEFAULT_TIMEOUT / 60} minutes unless you pass timeout (at most ${BASH_MAX_TIMEOUT / 60} minutes); run anything that may take longer with bg_run instead.`,
 			"Unless the user explicitly asks for that bash command, never wait, poll or sleep in bash (while/until loops with sleep, watch, repeated status checks), not even as part of a larger command; start the wait with bg_run and pass wake_on to be woken when the awaited output appears.",
