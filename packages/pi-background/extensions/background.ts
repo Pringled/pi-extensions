@@ -107,9 +107,11 @@ export default function (pi: ExtensionAPI) {
 	// One line per running job above the input, with its elapsed time and latest output
 	let ui: ExtensionContext["ui"] | undefined;
 	const running = () => [...jobs.values()].filter((job) => job.status === "running");
+	// Turned off with "background": { "showJobs": false } in pi's settings.json
+	const enabled = () => (pi.getSettings() as { background?: { showJobs?: boolean } }).background?.showJobs !== false;
 	const showJobs = () => {
 		if (!ui) return;
-		if (running().length === 0) return ui.setWidget("background-jobs", undefined);
+		if (!enabled() || running().length === 0) return ui.setWidget("background-jobs", undefined);
 		ui.setWidget("background-jobs", (tui, theme) => {
 			const timer = setInterval(() => tui.requestRender(), 1000);
 			return {
