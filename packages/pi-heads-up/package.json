@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "After a task, flags the one thing you might have missed, like Claude Code's \"You should know\"",
+  "description": "After a task, flags the one thing you might have missed",
   "keywords": [
     "pi-package",
     "pi",

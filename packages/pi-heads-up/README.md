@@ -1,6 +1,6 @@
 # pi-heads-up
 
-After [pi](https://pi.dev) finishes a task, a quick second look at the conversation flags the one thing you might have missed, like Claude Code's "You should know": a tradeoff pi made without saying so, something it didn't check, or a change beyond what you asked for.
+After [pi](https://pi.dev) finishes a task, a quick second look at the conversation flags the one thing you might have missed: a tradeoff pi made without saying so, something it didn't check, or a change beyond what you asked for.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-heads-up-dark.gif">
@@ -13,7 +13,7 @@ pi install npm:pi-heads-up
 
 ## Usage
 
-Nothing to do. When there's something worth knowing, a note shows above the input:
+When there's something worth knowing, a note shows above the input:
 
 ```
 ✦ heads-up: The rename removed spread() outright with no alias, so any code outside this folder that imports spread will break.
