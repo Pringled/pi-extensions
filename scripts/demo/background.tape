@@ -10,9 +10,9 @@ Sleep 4s
 Show
 
 Sleep 1s
-Type@20ms "Run train.py with python3 in the background. Tell me the loss as soon as epoch 3 is done, and again when training finishes."
+Type@20ms "Train the model with train.py and tell me the final loss."
 Sleep 500ms
 Enter
-Wait+Screen@120s /saved model/
-Wait+Screen@60s /0\.156/
-Sleep 6s
+# pi puts the training in the background by itself; the jobs line shows the progress bar until it exits
+Wait+Screen@120s /exited 0/
+Sleep 10s
