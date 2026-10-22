@@ -1,7 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { normalizeContext } from "@earendil-works/pi-ai";
 import { convertToLlm, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 const PROMPT = `[Recap mode] The user stepped away from this session and is coming back to it. In one or two plain sentences, at most 40 words, recap where things stand: what was being worked on, what got done and what is next or waiting on them. Plain text without markdown, no preamble.`;
 // Within the prompt cache's 5 minutes, so the recap reuses it
@@ -12,8 +12,23 @@ export default function (pi: ExtensionAPI) {
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let pending: AbortController | undefined;
 
+	// Dimmed, with the recap wrapped to line up after its label
 	const show = (ctx: ExtensionContext, recap: string | undefined) =>
-		ctx.ui.setWidget("recap", recap ? (_tui, theme) => new Text(theme.fg("dim", `※ recap: ${recap}`), 1, 0) : undefined);
+		ctx.ui.setWidget(
+			"recap",
+			recap
+				? (_tui, theme) => ({
+						invalidate() {},
+						render(width: number) {
+							const label = "※ recap: ";
+							const indent = 1 + visibleWidth(label);
+							return wrapTextWithAnsi(recap, Math.max(10, width - indent - 1)).map((line, i) =>
+								theme.fg("dim", (i === 0 ? ` ${label}` : " ".repeat(indent)) + line),
+							);
+						},
+					})
+				: undefined,
+		);
 
 	const cancel = () => {
 		clearTimeout(timer);

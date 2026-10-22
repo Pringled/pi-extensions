@@ -10,7 +10,7 @@ Sleep 4s
 Show
 
 Sleep 1s
-Type@20ms "Rename spread() to value_range() in stats.py and test_stats.py, then run the tests."
+Type@20ms "Make mean() in stats.py return 0 instead of crashing on an empty list, add a test, and run the tests."
 Sleep 500ms
 Enter
 Wait+Screen@180s /heads-up:/
