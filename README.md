@@ -18,6 +18,7 @@ My extensions for the [pi](https://pi.dev) coding agent. Most of these are inspi
 | [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files pi edited along with the conversation.          | [npm](https://www.npmjs.com/package/pi-checkpoints) |
 | [`pi-next-prompt`](packages/pi-next-prompt) | Suggests your next prompt in grey after each reply.              | [npm](https://www.npmjs.com/package/pi-next-prompt) |
 | [`pi-away`](packages/pi-away)               | A one-line recap of the session when you come back.              | [npm](https://www.npmjs.com/package/pi-away)        |
+| [`pi-heads-up`](packages/pi-heads-up)       | Flags the one thing you might have missed after a task.          | [npm](https://www.npmjs.com/package/pi-heads-up)    |
 
 ```bash
 pi install npm:pi-polish
@@ -27,6 +28,7 @@ pi install npm:pi-context-bar
 pi install npm:pi-checkpoints
 pi install npm:pi-next-prompt
 pi install npm:pi-away
+pi install npm:pi-heads-up
 ```
 
 ## Author

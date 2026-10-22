@@ -1,0 +1,41 @@
+{
+  "name": "pi-heads-up",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Thomas van Dongen",
+  "type": "module",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-heads-up#readme",
+  "bugs": {
+    "url": "https://github.com/pringled/pi-extensions/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "description": "After a task, flags the one thing you might have missed",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "review",
+    "heads-up",
+    "assistant"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pringled/pi-extensions.git",
+    "directory": "packages/pi-heads-up"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/heads-up.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-heads-up-dark.gif"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}
