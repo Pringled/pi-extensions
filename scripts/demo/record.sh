@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Records the README demos (assets/images/pi-*-{dark,light}.gif and .png) from the tapes in this folder.
-# Pass demo names (polish, background, model-pick, context-bar, checkpoints, next-prompt, away, heads-up) to record only those, and THEMES=dark or THEMES=light for one theme. Uses your pi login. Set PI_PREFIX to wrap pi in a sandbox, e.g. PI_PREFIX="nono run --profile pi --allow-cwd --allow $TMPDIR --".
+# Pass demo names (full, polish, background, model-pick, context-bar, checkpoints, next-prompt, away, heads-up) to record only those, and THEMES=dark or THEMES=light for one theme. Uses your pi login. Set PI_PREFIX to wrap pi in a sandbox, e.g. PI_PREFIX="nono run --profile pi --allow-cwd --allow $TMPDIR --".
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -11,7 +11,7 @@ agent="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 provider="${DEMO_PROVIDER:-github-copilot}"
 model="${DEMO_MODEL:-claude-opus-5.5}"
 demos=("$@")
-[ $# -eq 0 ] && demos=(polish background model-pick context-bar checkpoints next-prompt away heads-up)
+[ $# -eq 0 ] && demos=(full polish background model-pick context-bar checkpoints next-prompt away heads-up)
 
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
