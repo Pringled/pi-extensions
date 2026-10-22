@@ -1,8 +1,8 @@
 import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createLocalBashOperations, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { createLocalBashOperations, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const TAIL_LINES = 20;
@@ -11,6 +11,7 @@ const BASH_DEFAULT_TIMEOUT = 120;
 const BASH_MAX_TIMEOUT = 600;
 const WAKE_DEBOUNCE_MS = 1000;
 const MAX_WAKES = 10;
+const MAX_SHOWN_JOBS = 3;
 
 interface Job {
 	id: string;
@@ -21,6 +22,8 @@ interface Job {
 	status: "running" | "exited" | "killed" | "failed";
 	exitCode?: number | null;
 	ended?: number;
+	// The latest output line, shown while the job runs
+	lastLine?: string;
 }
 
 function tail(path: string, lines: number): string {
@@ -101,6 +104,34 @@ export default function (pi: ExtensionAPI) {
 		};
 	};
 
+	// One line per running job above the input, with its elapsed time and latest output
+	let ui: ExtensionContext["ui"] | undefined;
+	const running = () => [...jobs.values()].filter((job) => job.status === "running");
+	const showJobs = () => {
+		if (!ui) return;
+		if (running().length === 0) return ui.setWidget("background-jobs", undefined);
+		ui.setWidget("background-jobs", (tui, theme) => {
+			const timer = setInterval(() => tui.requestRender(), 1000);
+			return {
+				dispose: () => clearInterval(timer),
+				invalidate() {},
+				render(width: number) {
+					const live = running();
+					const lines = live.slice(0, MAX_SHOWN_JOBS).map((job) => {
+						const command = job.command.split("\n")[0];
+						const text =
+							theme.fg("accent", " ⏵ ") +
+							theme.fg("toolTitle", `${job.id} ${command.length > 40 ? `${command.slice(0, 39)}…` : command}`) +
+							theme.fg("dim", ` · ${elapsed(job)}${job.lastLine ? ` · ${job.lastLine}` : ""}`);
+						return truncateToWidth(text, width);
+					});
+					if (live.length > MAX_SHOWN_JOBS) lines.push(theme.fg("dim", `   and ${live.length - MAX_SHOWN_JOBS} more`));
+					return lines;
+				},
+			};
+		});
+	};
+
 	const find = (id: string): Job => {
 		const job = jobs.get(id);
 		if (!job) throw new Error(`No background job ${id}; known: ${[...jobs.keys()].join(", ") || "none"}`);
@@ -171,9 +202,13 @@ export default function (pi: ExtensionAPI) {
 			const onData = (d: Buffer) => {
 				out.write(d);
 				watch?.(d);
+				// Progress bars redraw with \r, so the last segment of either kind of line break is the current state
+				const last = d.toString("utf8").replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").split(/\r\n|\r|\n/).map((line) => line.trim()).filter(Boolean).at(-1);
+				if (last) job.lastLine = last;
 			};
 
-			ops.exec(params.command, params.cwd ?? ctx.cwd, { onData, signal: job.controller.signal })
+			// Output goes to a pipe, where Python would buffer prints until it exits; unbuffered, the latest line and wake_on stay live
+			ops.exec(`export PYTHONUNBUFFERED=1; ${params.command}`, params.cwd ?? ctx.cwd, { onData, signal: job.controller.signal })
 				.then(({ exitCode }) => {
 					job.status = "exited";
 					job.exitCode = exitCode;
@@ -184,6 +219,7 @@ export default function (pi: ExtensionAPI) {
 				})
 				.finally(() => {
 					job.ended = Date.now();
+					showJobs();
 					out.end(() => {
 						// A kill from session shutdown has no session left to notify
 						if (job.status === "killed" && !jobs.has(id)) return;
@@ -195,6 +231,8 @@ export default function (pi: ExtensionAPI) {
 					});
 				});
 
+			if (ctx.mode === "tui") ui = ctx.ui;
+			showJobs();
 			return { content: [{ type: "text", text: `Started ${id}; log: ${log}. You will be notified when it exits.` }], details: { id, log } };
 		},
 	});
