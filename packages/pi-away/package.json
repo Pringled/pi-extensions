@@ -1,0 +1,41 @@
+{
+  "name": "pi-away",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Thomas van Dongen",
+  "type": "module",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-away#readme",
+  "bugs": {
+    "url": "https://github.com/pringled/pi-extensions/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "description": "A one-line recap of where the session stands when you come back to pi, like Claude Code, plus /recap",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "recap",
+    "summary",
+    "session"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pringled/pi-extensions.git",
+    "directory": "packages/pi-away"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/away.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-away-dark.gif"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}
