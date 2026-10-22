@@ -22,7 +22,7 @@ The prompt lists the files it will restore, so you can say no and keep what you 
 
 Before pi first edits or writes a file in a run, the file's content is saved, and again once the run is done. Each saved version is kept once under `~/.pi/agent/checkpoints`, and the session keeps track of which files each run changed. Undoing a new file also removes the folders pi made for it, as long as they're empty.
 
-Only changes made with pi's `edit` and `write` tools are tracked, like Claude Code's checkpoints. Changes made by shell commands aren't, and if you or a shell command changed one of pi's files since, restoring overwrites that change.
+Only changes made with pi's `edit` and `write` tools are tracked. Changes made by shell commands aren't, and if you or a shell command changed one of pi's files since, restoring overwrites that change.
 
 ## License
 
