@@ -1,10 +1,10 @@
 # pi-extensions
 
-A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal by design: most are under 300 lines with no dependencies, and each one can be installed on its own to fit your workflow. All of them are part of my daily setup.
+A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal by design: most are under 300 lines with no dependencies, and each one can be installed on its own to fit your workflow. All of them are part of my daily setup.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-extensions-dark.gif">
-  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-extensions-light.gif" alt="pi with pi-polish, pi-context-bar and pi-next-prompt">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-extensions-light.gif" alt="Pi with pi-polish, pi-context-bar and pi-next-prompt">
 </picture>
 
 ## Look and feel
@@ -37,8 +37,8 @@ A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal
 
 | Package | What it does | npm |
 | --- | --- | --- |
-| [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
-| [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
+| [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so Pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
+| [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files Pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
 | [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
 
 <details>

@@ -1,6 +1,6 @@
 # pi-next-prompt
 
-Suggests what you'll probably ask [pi](https://pi.dev) next. When pi finishes a reply, a suggestion shows up in grey in the empty input, such as "Go ahead and fix it, then run the tests."
+Suggests what you'll probably ask [Pi](https://pi.dev) next. When Pi finishes a reply, a suggestion shows up in grey in the empty input, such as "Go ahead and fix it, then run the tests."
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-next-prompt-dark.gif">
@@ -16,11 +16,11 @@ pi install npm:pi-next-prompt
 - `Tab` or `→` puts the suggestion in the input, so you can send it with `Enter` or edit it first.
 - Typing anything else makes it go away.
 
-There's no suggestion when pi doesn't see an obvious next step, after an error, or while you have messages queued.
+There's no suggestion when Pi doesn't see an obvious next step, after an error, or while you have messages queued.
 
 ## How it works
 
-After each reply, the extension asks the same model for one short guess at your next message. The request starts with exactly what pi just sent, at the same thinking level, so it reuses pi's prompt cache.
+After each reply, the extension asks the same model for one short guess at your next message. The request starts with exactly what Pi just sent, at the same thinking level, so it reuses Pi's prompt cache.
 
 ## License
 

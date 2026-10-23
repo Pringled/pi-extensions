@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "A one-line pi footer with the model, git branch, a context bar and the session cost",
+  "description": "A one-line Pi footer with the model, git branch, a context bar and the session cost",
   "keywords": [
     "pi-package",
     "pi",

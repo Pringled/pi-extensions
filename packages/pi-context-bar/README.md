@@ -1,6 +1,6 @@
 # pi-context-bar
 
-A one-line footer for [pi](https://pi.dev), styled after [ccstatusline](https://github.com/sirmalloc/ccstatusline): the model, git branch, a context bar and the session cost.
+A one-line footer for [Pi](https://pi.dev), styled after [ccstatusline](https://github.com/sirmalloc/ccstatusline): the model, git branch, a context bar and the session cost.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-context-bar-dark.gif">
@@ -18,7 +18,7 @@ pi install npm:pi-context-bar
 - A context bar with used and total tokens. It turns yellow at 50% and red at 80%.
 - The total cost of the session so far.
 
-It replaces pi's default footer.
+It replaces Pi's default footer.
 
 ## License
 

@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "A model picker for pi that puts your favorite and recently used models first",
+  "description": "A model picker for Pi that puts your favorite and recently used models first",
   "keywords": [
     "pi-package",
     "pi",

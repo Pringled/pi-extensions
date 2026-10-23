@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "Lets pi run long commands in the background and wakes it when they finish, so it never blocks or hangs",
+  "description": "Lets Pi run long commands in the background and wakes it when they finish, so it never blocks or hangs",
   "keywords": [
     "pi-package",
     "pi",
