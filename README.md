@@ -69,8 +69,6 @@ Extensions that make the [pi](https://pi.dev) coding agent nicer to use. Each on
 
 ## Helpers
 
-Short notes pi writes for you after a task.
-
 | Package | What it does | npm |
 | --- | --- | --- |
 | [`pi-next-prompt`](packages/pi-next-prompt) | Suggests your next prompt in grey after each reply. | [![npm](https://img.shields.io/npm/v/pi-next-prompt)](https://www.npmjs.com/package/pi-next-prompt) |
