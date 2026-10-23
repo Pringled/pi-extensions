@@ -1,6 +1,6 @@
 # pi-extensions
 
-A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal by design: most are under 300 lines with no dependencies, and each one can be installed on its own to fit your workflow.
+A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal by design: most are under 300 lines with no dependencies, and each one can be installed on its own to fit your workflow. All of them are part of my daily setup.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-extensions-dark.gif">
