@@ -9,8 +9,6 @@ Extensions that make the [pi](https://pi.dev) coding agent nicer to use. Each on
 
 ## Look and feel
 
-How pi looks: compact tool output with real diffs, and a one-line footer.
-
 | Package | What it does | npm |
 | --- | --- | --- |
 | [`pi-polish`](packages/pi-polish) | Claude Code-style tool rows and diffs. | [![npm](https://img.shields.io/npm/v/pi-polish)](https://www.npmjs.com/package/pi-polish) |
@@ -36,8 +34,6 @@ How pi looks: compact tool output with real diffs, and a one-line footer.
 </details>
 
 ## Workflow
-
-How you work with pi: picking models, running long commands in the background, and rewinding edits.
 
 | Package | What it does | npm |
 | --- | --- | --- |
@@ -73,7 +69,7 @@ How you work with pi: picking models, running long commands in the background, a
 
 ## Helpers
 
-Short notes pi writes for you after a task: what to ask next, a recap, and anything you might have missed.
+Short notes pi writes for you after a task.
 
 | Package | What it does | npm |
 | --- | --- | --- |
