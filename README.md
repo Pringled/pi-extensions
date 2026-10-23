@@ -37,19 +37,12 @@ A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal
 
 | Package | What it does | npm |
 | --- | --- | --- |
-| [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
 | [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
 | [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
+| [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
 
 <details>
 <summary>Demos</summary>
-
-**pi-model-pick**
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-dark.gif">
-  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-light.gif" alt="pi-model-pick demo">
-</picture>
 
 **pi-background**
 
@@ -63,6 +56,13 @@ A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-checkpoints-dark.gif">
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-checkpoints-light.gif" alt="pi-checkpoints demo">
+</picture>
+
+**pi-model-pick**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-light.gif" alt="pi-model-pick demo">
 </picture>
 
 </details>
@@ -106,9 +106,9 @@ A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal
 ```bash
 pi install npm:pi-polish
 pi install npm:pi-context-bar
-pi install npm:pi-model-pick
 pi install npm:pi-background
 pi install npm:pi-checkpoints
+pi install npm:pi-model-pick
 pi install npm:pi-next-prompt
 pi install npm:pi-away
 pi install npm:pi-heads-up
