@@ -1,6 +1,6 @@
 # pi-extensions
 
-Extensions that make the [pi](https://pi.dev) coding agent nicer to use. Each one is its own npm package, so you can install only the ones you want. They're also small: most are a single file of under 300 lines with no dependencies, so you can read what an extension does before you install it.
+A set of extensions that make [pi](https://pi.dev) nicer to use. They're minimal by design: most are under 300 lines with no dependencies, and each one can be installed on its own to fit your workflow.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-extensions-dark.gif">
