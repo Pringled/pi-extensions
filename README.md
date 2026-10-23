@@ -1,6 +1,6 @@
 # pi-extensions
 
-Extensions that make the [pi](https://pi.dev) coding agent nicer to use: how it looks, how it handles long tasks, and small helpers around your prompts. Each one is its own npm package, so you can install only the ones you want.
+Extensions that make the [pi](https://pi.dev) coding agent nicer to use. Each one is its own npm package, so you can install only the ones you want. They're also small: most are a single file of under 300 lines with no dependencies, so you can read what an extension does before you install it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-extensions-dark.gif">
@@ -13,7 +13,6 @@ Extensions that make the [pi](https://pi.dev) coding agent nicer to use: how it 
 | --- | --- | --- |
 | [`pi-polish`](packages/pi-polish) | Claude Code-style tool rows and diffs. | [![npm](https://img.shields.io/npm/v/pi-polish)](https://www.npmjs.com/package/pi-polish) |
 | [`pi-context-bar`](packages/pi-context-bar) | A one-line footer with the model, branch, context bar and cost. | [![npm](https://img.shields.io/npm/v/pi-context-bar)](https://www.npmjs.com/package/pi-context-bar) |
-| [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
 
 <details>
 <summary>Demos</summary>
@@ -32,24 +31,25 @@ Extensions that make the [pi](https://pi.dev) coding agent nicer to use: how it 
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-context-bar-light.gif" alt="pi-context-bar demo">
 </picture>
 
+</details>
+
+## Workflow
+
+| Package | What it does | npm |
+| --- | --- | --- |
+| [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
+| [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
+| [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
+
+<details>
+<summary>Demos</summary>
+
 **pi-model-pick**
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-dark.gif">
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-model-pick-light.gif" alt="pi-model-pick demo">
 </picture>
-
-</details>
-
-## Long tasks
-
-| Package | What it does | npm |
-| --- | --- | --- |
-| [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
-| [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
-
-<details>
-<summary>Demos</summary>
 
 **pi-background**
 
@@ -68,6 +68,8 @@ Extensions that make the [pi](https://pi.dev) coding agent nicer to use: how it 
 </details>
 
 ## Helpers
+
+Short notes pi writes for you after a task: what to ask next, a recap, and anything you might have missed.
 
 | Package | What it does | npm |
 | --- | --- | --- |
