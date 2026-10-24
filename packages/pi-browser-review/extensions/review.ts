@@ -1,7 +1,52 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { createServer, request, type Server } from "node:http";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const RULE = "=".repeat(50);
+const SEND_PATH = "/__pi-review/send";
+// A self-contained floating button, so it doesn't depend on how difit builds its page
+const BUTTON = `<script>(() => {
+	const b = document.createElement("button");
+	b.textContent = "Send to Pi";
+	Object.assign(b.style, { position: "fixed", right: "24px", bottom: "24px", zIndex: 2147483647, padding: "10px 18px", border: "0", borderRadius: "8px",
+		background: "#238636", color: "#fff", font: "600 14px -apple-system, system-ui, sans-serif", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,0,0,.3)" });
+	b.onclick = async () => {
+		b.disabled = true;
+		b.textContent = "Sending…";
+		await new Promise((r) => setTimeout(r, 400));
+		await fetch("${SEND_PATH}", { method: "POST" }).catch(() => {});
+		b.textContent = "Sent to Pi";
+	};
+	document.body.appendChild(b);
+})();</script>`;
+
+/** A local server in front of difit that passes everything through and adds the Send to Pi button to its page. Exported for the demo recording. */
+export function startProxy(target: URL, onSend: () => void): Promise<Server> {
+	const server = createServer((req, res) => {
+		if (req.method === "POST" && req.url === SEND_PATH) {
+			onSend();
+			return void res.writeHead(204).end();
+		}
+		const headers = { ...req.headers, host: target.host };
+		// Uncompressed, so the button can be added to the HTML
+		delete headers["accept-encoding"];
+		const upstream = request({ hostname: target.hostname, port: target.port, path: req.url, method: req.method, headers }, (up) => {
+			if (!String(up.headers["content-type"]).startsWith("text/html")) {
+				res.writeHead(up.statusCode ?? 502, up.headers);
+				return void up.pipe(res);
+			}
+			let html = "";
+			up.on("data", (d: Buffer) => (html += d.toString()));
+			up.on("end", () => {
+				const { "content-length": _, ...rest } = up.headers;
+				res.writeHead(up.statusCode ?? 200, rest).end(html.includes("</body>") ? html.replace("</body>", `${BUTTON}</body>`) : html + BUTTON);
+			});
+		});
+		upstream.on("error", () => res.writeHead(502).end());
+		req.pipe(upstream);
+	});
+	return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
+}
 
 /** The comments block difit prints when its tab closes, between two rules after the "Comments from review session" heading. */
 function reviewComments(output: string): string {
@@ -32,7 +77,7 @@ export default function (pi: ExtensionAPI) {
 	};
 
 	pi.registerCommand("review", {
-		description: "Review your changes in the browser with difit; run /review again to send your line comments to Pi. Optionally pass the branch to compare with",
+		description: "Review your changes in the browser with difit; send your line comments to Pi with the button there or /review again. Optionally pass the branch to compare with",
 		handler: async (args, ctx) => {
 			// A second /review finishes the open one; difit prints the comments on its way out
 			if (difit) return void difit.kill("SIGINT");
@@ -41,18 +86,22 @@ export default function (pi: ExtensionAPI) {
 			// Everything on this branch since it left the base, uncommitted changes and new files included
 			const base = args.trim() || (await defaultBase(ctx.cwd));
 			// --keep-alive so reloading or closing the tab doesn't end the review, --clean so earlier comments the browser saved aren't sent again
-			const difitArgs = [".", ...(base ? [base, "--merge-base"] : []), "--include-untracked", "--keep-alive", "--clean"];
+			// --no-open because the browser should open the address with the button, not difit's own
+			const difitArgs = [".", ...(base ? [base, "--merge-base"] : []), "--include-untracked", "--keep-alive", "--clean", "--no-open"];
 			// difit marks new files with git add --intent-to-add to show them; this undoes that afterwards
 			const untracked = (await git(ctx.cwd, "ls-files", "--others", "--exclude-standard")).split("\n").filter(Boolean);
 			let output = "";
 			let empty = false;
 			let shown = false;
+			let proxy: Server | undefined;
 			const child = spawn("difit", difitArgs, { cwd: ctx.cwd, stdio: ["ignore", "pipe", "pipe"] });
 			difit = child;
 
 			const done = () => {
 				difit = undefined;
 				ctx.ui.setWidget("review", undefined);
+				proxy?.closeAllConnections();
+				proxy?.close();
 				// One at a time, so a file deleted meanwhile doesn't stop the others
 				for (const file of untracked) void git(ctx.cwd, "reset", "--quiet", "--", file);
 			};
@@ -72,10 +121,17 @@ export default function (pi: ExtensionAPI) {
 				}
 				if (url && !empty && !shown) {
 					shown = true;
-					ctx.ui.setWidget("review", (_tui, theme) => ({
-						invalidate() {},
-						render: () => [theme.fg("dim", ` ◆ Reviewing in the browser at ${url}; run /review again to send your comments to Pi`)],
-					}));
+					void startProxy(new URL(url), () => child.kill("SIGINT")).then((server) => {
+						proxy = server;
+						const address = server.address();
+						const page = `http://127.0.0.1:${typeof address === "object" && address ? address.port : ""}`;
+						// Opening the browser can fail, for example in a sandbox; the address is shown either way
+						void pi.exec(process.platform === "darwin" ? "open" : "xdg-open", [page]).catch(() => {});
+						ctx.ui.setWidget("review", (_tui, theme) => ({
+							invalidate() {},
+							render: () => [theme.fg("dim", ` ◆ Reviewing in the browser at ${page}; press Send to Pi there or run /review again`)],
+						}));
+					});
 				}
 			});
 			child.on("close", (code) => {

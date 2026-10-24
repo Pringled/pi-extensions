@@ -1,4 +1,4 @@
-// Records the browser half of the review demo: difit at <url>, with one comment typed on the median function.
+// Records the browser half of the review demo: difit behind the extension's proxy at <url>, with one comment typed on the median function and sent with Send to Pi.
 // Usage: node browser.mjs <url> <theme: dark|light> <comment> <out dir>. Writes frame PNGs and frames.json ([{file, seconds}]).
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -98,7 +98,15 @@ try {
 	})()`);
 	await click(submit);
 	await sleep(500);
-	await frame(1.4);
+	await frame(0.9);
+
+	const sendToPi = await evaluate(`(() => {
+		const r = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Send to Pi").getBoundingClientRect();
+		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+	})()`);
+	await click(sendToPi);
+	await sleep(700);
+	await frame(1.0);
 
 	writeFileSync(join(outDir, "frames.json"), JSON.stringify(frames));
 	ws.close();

@@ -21,7 +21,7 @@ Run `/review`. Your browser opens with everything on the current branch since it
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-browser-review-browser-light.png" alt="The review in difit, with two comments on the diff">
 </picture>
 
-When you're done, run `/review` again in Pi and your comments go to Pi as one message:
+When you're done, press **Send to Pi** in the bottom-right corner, or run `/review` again in Pi. Your comments go to Pi as one message:
 
 ```
 Here are my review comments on the changes against main:
@@ -37,7 +37,7 @@ If Pi is busy, the message waits until it's done. If you didn't leave any commen
 
 - `/review develop` compares with another branch instead of the default one.
 - On `main` itself, `/review` shows your uncommitted changes.
-- If the browser didn't open, the address is shown above Pi's input.
+- If the browser didn't open, for example because Pi runs in a sandbox, the address is shown above Pi's input.
 
 ## License
 

@@ -15,11 +15,8 @@ Type@40ms "/review"
 Sleep 500ms
 Enter
 Wait+Screen@20s /Reviewing in the browser/
-Sleep 3s
-Type@40ms "/review"
-Sleep 500ms
-Enter
-Wait+Screen@20s /review comments/
-# Pi works through both comments; it's done when pi-next-prompt's suggestion appears in the input, right above its border
+# The browser half (comment, Send to Pi) is spliced in here by review/splice.sh
+Wait+Screen@30s /review comments/
+# Pi works through the comment; it's done when pi-next-prompt's suggestion appears in the input, right above its border
 Wait+Screen@120s /❯ +\S.*\n─+/
 Sleep 4s
