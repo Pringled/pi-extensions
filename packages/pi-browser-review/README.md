@@ -39,6 +39,8 @@ If Pi is busy, the message waits until it's done. If you didn't leave any commen
 - On `main` itself, `/review` shows your uncommitted changes.
 - If the browser didn't open, for example because Pi runs in a sandbox, the address is shown above Pi's input.
 
+Tested with difit 5. The Send to Pi button doesn't depend on how difit's page is built, and if a future difit prints its comments differently, `/review` warns you instead of dropping them, so you can still copy them with difit's own Copy All Prompt button.
+
 ## License
 
 MIT

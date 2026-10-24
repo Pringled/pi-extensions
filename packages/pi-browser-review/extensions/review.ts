@@ -14,8 +14,9 @@ const BUTTON = `<script>(() => {
 		b.disabled = true;
 		b.textContent = "Sending…";
 		await new Promise((r) => setTimeout(r, 400));
-		await fetch("${SEND_PATH}", { method: "POST" }).catch(() => {});
-		b.textContent = "Sent to Pi";
+		const res = await fetch("${SEND_PATH}", { method: "POST", headers: { "x-pi-review": "send" } }).catch(() => undefined);
+		b.textContent = res?.ok ? "Sent to Pi" : "Couldn't reach Pi";
+		b.disabled = Boolean(res?.ok);
 	};
 	document.body.appendChild(b);
 })();</script>`;
@@ -23,7 +24,10 @@ const BUTTON = `<script>(() => {
 /** A local server in front of difit that passes everything through and adds the Send to Pi button to its page. Exported for the demo recording. */
 export function startProxy(target: URL, onSend: () => void): Promise<Server> {
 	const server = createServer((req, res) => {
-		if (req.method === "POST" && req.url === SEND_PATH) {
+		// Only this machine's own addresses, so a website can't reach the review through DNS rebinding
+		if (!/^(127\.0\.0\.1|localhost):\d+$/.test(req.headers.host ?? "")) return void res.writeHead(403).end();
+		// The header makes browsers block requests from other sites, so they can't end the review
+		if (req.method === "POST" && req.url === SEND_PATH && req.headers["x-pi-review"] === "send") {
 			onSend();
 			return void res.writeHead(204).end();
 		}
@@ -48,7 +52,7 @@ export function startProxy(target: URL, onSend: () => void): Promise<Server> {
 	return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
 }
 
-/** The comments block difit prints when its tab closes, between two rules after the "Comments from review session" heading. */
+/** The comments block difit prints when it stops, between two rules after the "Comments from review session" heading. */
 function reviewComments(output: string): string {
 	const start = output.indexOf("Comments from review session:");
 	if (start === -1) return "";
@@ -57,7 +61,8 @@ function reviewComments(output: string): string {
 }
 
 export default function (pi: ExtensionAPI) {
-	let difit: ChildProcess | undefined;
+	// The open review: difit's process and how to finish it
+	let review: { child: ChildProcess; stop: () => void } | undefined;
 
 	const git = async (cwd: string, ...args: string[]) => {
 		const result = await pi.exec("git", args, { cwd });
@@ -80,7 +85,7 @@ export default function (pi: ExtensionAPI) {
 		description: "Review your changes in the browser with difit; send your line comments to Pi with the button there or /review again. Optionally pass the branch to compare with",
 		handler: async (args, ctx) => {
 			// A second /review finishes the open one; difit prints the comments on its way out
-			if (difit) return void difit.kill("SIGINT");
+			if (review) return review.stop();
 			if (!(await git(ctx.cwd, "rev-parse", "--is-inside-work-tree"))) return ctx.ui.notify("/review needs a git repository", "error");
 
 			// Everything on this branch since it left the base, uncommitted changes and new files included
@@ -94,11 +99,17 @@ export default function (pi: ExtensionAPI) {
 			let empty = false;
 			let shown = false;
 			let proxy: Server | undefined;
+			// Where difit's output stood when it was asked to stop; what it prints after that is its answer
+			let stoppedAt = Number.POSITIVE_INFINITY;
 			const child = spawn("difit", difitArgs, { cwd: ctx.cwd, stdio: ["ignore", "pipe", "pipe"] });
-			difit = child;
+			const stop = () => {
+				stoppedAt = output.length;
+				child.kill("SIGINT");
+			};
+			review = { child, stop };
 
 			const done = () => {
-				difit = undefined;
+				review = undefined;
 				ctx.ui.setWidget("review", undefined);
 				proxy?.closeAllConnections();
 				proxy?.close();
@@ -113,7 +124,8 @@ export default function (pi: ExtensionAPI) {
 			child.stderr?.on("data", (d: Buffer) => (output += d.toString()));
 			child.stdout?.on("data", (d: Buffer) => {
 				output += d.toString();
-				const url = output.match(/server started on (\S+)/)?.[1];
+				// The first local address difit prints, whatever the text around it
+				const url = output.match(/https?:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+/)?.[0];
 				if (!empty && /No differences found/.test(output)) {
 					empty = true;
 					child.kill("SIGINT");
@@ -121,7 +133,7 @@ export default function (pi: ExtensionAPI) {
 				}
 				if (url && !empty && !shown) {
 					shown = true;
-					void startProxy(new URL(url), () => child.kill("SIGINT")).then((server) => {
+					void startProxy(new URL(url), stop).then((server) => {
 						proxy = server;
 						const address = server.address();
 						const page = `http://127.0.0.1:${typeof address === "object" && address ? address.port : ""}`;
@@ -135,11 +147,13 @@ export default function (pi: ExtensionAPI) {
 				}
 			});
 			child.on("close", (code) => {
-				if (difit !== child) return;
+				if (review?.child !== child) return;
 				done();
 				if (empty) return;
 				const comments = reviewComments(output);
 				if (comments) pi.sendUserMessage(`Here are my review comments on the changes${base ? ` against ${base}` : ""}:\n\n${comments}`, { deliverAs: "followUp" });
+				// difit mentioned comments in a form this doesn't recognise, so say so rather than lose them quietly
+				else if (/comment/i.test(output.slice(stoppedAt))) ctx.ui.notify("/review couldn't read difit's comments; copy them with Copy All Prompt in difit instead", "warning");
 				else if (code === 0) ctx.ui.notify("Review closed without comments", "info");
 				else ctx.ui.notify(`/review: difit stopped (exit ${code}). ${output.trim().split("\n").at(-1) ?? ""}`, "error");
 			});
@@ -147,6 +161,6 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_shutdown", async () => {
-		difit?.kill("SIGINT");
+		review?.child.kill("SIGINT");
 	});
 }
