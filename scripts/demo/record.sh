@@ -48,4 +48,8 @@ EOF
   pids+=($!)
 done; done
 for pid in "${pids[@]}"; do wait "$pid"; done
+# The review demo's browser half is recorded separately and spliced into its terminal recording
+if [[ " ${demos[*]} " == *" review "* ]]; then
+  for theme in ${THEMES:-dark light}; do scripts/demo/review/splice.sh "$theme"; done
+fi
 echo "Recorded ${demos[*]} (${THEMES:-dark light}) to assets/images"
