@@ -39,6 +39,7 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
 | --- | --- | --- |
 | [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so Pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
 | [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files Pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
+| [`pi-browser-review`](packages/pi-browser-review) | Review Pi's changes in a GitHub-style browser view and send your line comments back. | [![npm](https://img.shields.io/npm/v/pi-browser-review)](https://www.npmjs.com/package/pi-browser-review) |
 | [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
 
 <details>
@@ -108,6 +109,7 @@ pi install npm:pi-polish
 pi install npm:pi-context-bar
 pi install npm:pi-background
 pi install npm:pi-checkpoints
+pi install npm:pi-browser-review
 pi install npm:pi-model-pick
 pi install npm:pi-next-prompt
 pi install npm:pi-away
