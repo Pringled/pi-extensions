@@ -59,6 +59,13 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-checkpoints-light.gif" alt="pi-checkpoints demo">
 </picture>
 
+**pi-browser-review**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-browser-review-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-browser-review-light.gif" alt="pi-browser-review demo">
+</picture>
+
 **pi-model-pick**
 
 <picture>

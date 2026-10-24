@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for the browser in the review demo: leaves the comments from comments.json on the diff
+url="${1%/}"
+(sleep 2 && curl -s -X POST -H "Content-Type: application/json" "$url/api/comment-imports" -d @"$(dirname "$0")/comments.json" >/dev/null) &

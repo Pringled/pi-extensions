@@ -1,0 +1,4 @@
+[
+  {"type": "thread", "filePath": "stats.py", "position": {"side": "new", "line": {"start": 14, "end": 20}}, "body": "Use statistics.median here instead of writing our own"},
+  {"type": "thread", "filePath": "test_stats.py", "position": {"side": "new", "line": 14}, "body": "Also test an even number of values"}
+]
