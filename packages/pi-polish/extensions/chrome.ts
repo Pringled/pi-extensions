@@ -6,7 +6,8 @@ const REPLY = "●";
 const ORANGE = "\x1b[38;2;217;119;87m";
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
-const SPINNER = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"].map((f) => `${ORANGE}${f}${RESET}`);
+// ✱ rather than ✳, which Windows Terminal draws as a green emoji
+const SPINNER = ["·", "✢", "✱", "✶", "✻", "✽", "✻", "✶", "✱", "✢"].map((f) => `${ORANGE}${f}${RESET}`);
 const LEADING_ESCAPES = /^((?:\x1b\[[0-9;]*m|\x1b\][^\x07]*\x07)*) {2}/;
 const OSC133_START = "\x1b]133;A\x07";
 const OSC133_END = "\x1b]133;B\x07\x1b]133;C\x07";

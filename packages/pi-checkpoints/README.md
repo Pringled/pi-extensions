@@ -22,7 +22,18 @@ The prompt lists the files it will restore, so you can say no and keep what you 
 
 Before Pi first edits or writes a file in a run, the file's content is saved, and again once the run is done. Each saved version is kept once under `~/.pi/agent/checkpoints`, and the session keeps track of which files each run changed. Undoing a new file also removes the folders Pi made for it, as long as they're empty.
 
-Only changes made with Pi's `edit` and `write` tools are tracked. Changes made by shell commands aren't, and if you or a shell command changed one of Pi's files since, restoring overwrites that change.
+Only changes made with Pi's `edit` and `write` tools are tracked; changes made by shell commands aren't.
+
+If you changed one of these files yourself after Pi edited it, by hand or with a shell command, the dialog marks it, because restoring would discard your change:
+
+```
+Restore 2 files?
+Put these back to how they were at this point:
+  stats.py  (changed since Pi's last edit; restoring discards those changes)
+  test_stats.py
+```
+
+Choose No to keep your files as they are. The conversation still moves to the point you picked.
 
 ## License
 

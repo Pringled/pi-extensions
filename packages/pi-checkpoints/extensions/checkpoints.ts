@@ -49,7 +49,8 @@ async function restore(path: string, { blob, newDirs = [] }: Target) {
 // What each file should become when moving from one point in the session tree to another:
 // undo the checkpoints only on the old branch, then replay the ones only on the new branch.
 // A checkpoint is saved right after a run's last message, so it counts as on a branch when that message is.
-function filesToRestore(entries: SessionEntry[], from: SessionEntry[], to: SessionEntry[]): Map<string, Target> {
+// Also returns what pi last left each of those files as, to spot changes made since outside pi.
+function filesToRestore(entries: SessionEntry[], from: SessionEntry[], to: SessionEntry[]) {
 	const fromIds = new Set(from.map((e) => e.id));
 	const toIds = new Set(to.map((e) => e.id));
 	const checkpoints = entries.filter(
@@ -61,18 +62,25 @@ function filesToRestore(entries: SessionEntry[], from: SessionEntry[], to: Sessi
 	const files = new Map<string, Target>();
 	for (const cp of only(fromIds, toIds).reverse()) for (const f of cp.files) files.set(f.path, { blob: f.before, newDirs: f.newDirs });
 	for (const cp of only(toIds, fromIds)) for (const f of cp.files) files.set(f.path, { blob: f.after });
-	return files;
+
+	const lastLeft = new Map<string, Blob>();
+	for (const cp of only(toIds, fromIds).reverse()) for (const f of cp.files) lastLeft.set(f.path, f.before);
+	for (const cp of checkpoints.filter((e) => fromIds.has(e.parentId!))) for (const f of cp.data!.files) lastLeft.set(f.path, f.after);
+	return { files, lastLeft };
 }
 
 async function offerRestore(ctx: ExtensionContext, from: SessionEntry[], to: SessionEntry[]) {
 	if (!ctx.hasUI) return;
-	const changes: [string, Target][] = [];
-	for (const [path, target] of filesToRestore(ctx.sessionManager.getEntries(), from, to)) {
-		if ((await hashOf(path)) !== target.blob) changes.push([path, target]);
+	const { files, lastLeft } = filesToRestore(ctx.sessionManager.getEntries(), from, to);
+	const changes: [string, Target, boolean][] = [];
+	for (const [path, target] of files) {
+		const now = await hashOf(path);
+		if (now !== target.blob) changes.push([path, target, now !== lastLeft.get(path)]);
 	}
 	if (changes.length === 0) return;
 
-	const list = changes.map(([path]) => `  ${relative(ctx.cwd, path)}`).join("\n");
+	const note = "  (changed since Pi's last edit; restoring discards those changes)";
+	const list = changes.map(([path, , edited]) => `  ${relative(ctx.cwd, path)}${edited ? note : ""}`).join("\n");
 	const noun = changes.length === 1 ? "file" : "files";
 	if (!(await ctx.ui.confirm(`Restore ${changes.length} ${noun}?`, `Put these back to how they were at this point:\n${list}`))) return;
 	for (const [path, target] of changes) await restore(path, target);
