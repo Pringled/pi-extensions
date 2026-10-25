@@ -89,8 +89,8 @@ export default function (pi: ExtensionAPI) {
 		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "followUp" });
 
 	// Jobs started in the same turn usually belong together, like several benchmarks to compare. While some of them
-	// still run, a finished one's result is added to the conversation without waking Pi, so it answers once at the end
-	// instead of after each job. A job that runs on too long doesn't hold the others back for more than GROUP_HOLD_MS.
+	// still run, a successful one's result is added to the conversation without waking Pi, so it answers once at the
+	// end instead of after each job. A job that runs on too long doesn't hold the others back for more than GROUP_HOLD_MS.
 	let turn = 0;
 	pi.on("turn_start", async () => {
 		turn++;
@@ -100,7 +100,8 @@ export default function (pi: ExtensionAPI) {
 		[...jobs.values()].filter((other) => other !== job && other.group === job.group && other.status === "running" && !other.watched);
 	const report = (job: Job, content: string, details: { headline: string; last: string; error: boolean }) => {
 		const others = job.watched ? [] : runningInGroup(job);
-		if (others.length === 0) {
+		// A failure wakes Pi straight away, so it can react before the rest of the group finishes
+		if (others.length === 0 || details.error) {
 			clearTimeout(holds.get(job.group));
 			holds.delete(job.group);
 			return wake(content, details);
