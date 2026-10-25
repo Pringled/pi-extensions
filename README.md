@@ -39,6 +39,7 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
 | --- | --- | --- |
 | [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so Pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
 | [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files Pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
+| [`pi-feedback`](packages/pi-feedback) | Give Pi feedback on its changes: comment on lines in a GitHub-style browser view and send them back. | [![npm](https://img.shields.io/npm/v/pi-feedback)](https://www.npmjs.com/package/pi-feedback) |
 | [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
 
 <details>
@@ -56,6 +57,13 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-checkpoints-dark.gif">
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-checkpoints-light.gif" alt="pi-checkpoints demo">
+</picture>
+
+**pi-feedback**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-feedback-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-feedback-light.gif" alt="pi-feedback demo">
 </picture>
 
 **pi-model-pick**
@@ -108,6 +116,7 @@ pi install npm:pi-polish
 pi install npm:pi-context-bar
 pi install npm:pi-background
 pi install npm:pi-checkpoints
+pi install npm:pi-feedback
 pi install npm:pi-model-pick
 pi install npm:pi-next-prompt
 pi install npm:pi-away
