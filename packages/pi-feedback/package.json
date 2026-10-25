@@ -34,6 +34,9 @@
       "./extensions/feedback.ts"
     ]
   },
+  "dependencies": {
+    "difit": "^5.0.12"
+  },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",

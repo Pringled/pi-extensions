@@ -1,5 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createServer, request, type Server } from "node:http";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const RULE = "=".repeat(50);
@@ -52,6 +55,17 @@ export function startProxy(target: URL, onSend: () => void): Promise<Server> {
 	return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
 }
 
+/** The difit that comes with this package, run with the Node that runs Pi, or else a difit on PATH. */
+function difitCommand(): [string, string[]] {
+	try {
+		const manifest = createRequire(import.meta.url).resolve("difit/package.json");
+		const bin = JSON.parse(readFileSync(manifest, "utf8")).bin;
+		return [process.execPath, [join(dirname(manifest), typeof bin === "string" ? bin : bin.difit)]];
+	} catch {
+		return ["difit", []];
+	}
+}
+
 /** The comments block difit prints when it stops, between two rules after the "Comments from review session" heading. */
 function reviewComments(output: string): string {
 	const start = output.indexOf("Comments from review session:");
@@ -101,7 +115,8 @@ export default function (pi: ExtensionAPI) {
 			let proxy: Server | undefined;
 			// Where difit's output stood when it was asked to stop; what it prints after that is its answer
 			let stoppedAt = Number.POSITIVE_INFINITY;
-			const child = spawn("difit", difitArgs, { cwd: ctx.cwd, stdio: ["ignore", "pipe", "pipe"] });
+			const [command, prefix] = difitCommand();
+			const child = spawn(command, [...prefix, ...difitArgs], { cwd: ctx.cwd, stdio: ["ignore", "pipe", "pipe"] });
 			const stop = () => {
 				stoppedAt = output.length;
 				child.kill("SIGINT");
@@ -118,7 +133,7 @@ export default function (pi: ExtensionAPI) {
 			};
 			child.on("error", (err: NodeJS.ErrnoException) => {
 				done();
-				const hint = err.code === "ENOENT" ? "difit isn't installed; install it with: npm install -g difit" : err.message;
+				const hint = err.code === "ENOENT" ? "difit wasn't found; reinstall pi-feedback with: pi install npm:pi-feedback" : err.message;
 				ctx.ui.notify(`/feedback: ${hint}`, "error");
 			});
 			child.stderr?.on("data", (d: Buffer) => (output += d.toString()));

@@ -8,7 +8,6 @@ Give [Pi](https://pi.dev) feedback on its changes: look through them in a GitHub
 </picture>
 
 ```bash
-npm install -g difit
 pi install npm:pi-feedback
 ```
 
