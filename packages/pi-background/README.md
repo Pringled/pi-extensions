@@ -16,6 +16,7 @@ pi install npm:pi-background
 - Long commands like downloads, builds, test suites and training runs go to the background, and Pi hears back with the exit code and the end of the output when they finish.
 - While a job runs, a line above the input shows it with its elapsed time and latest output, such as `⏵ bg1 python3 train.py · 4m12s · epoch 3/10 loss 0.41`.
 - Pi can wait for a specific line, such as a dev server's `listening on` or a training run's `epoch 3`, without checking again and again.
+- Jobs started together are reported together: when Pi starts several jobs at once, such as benchmarks to compare, it's woken once when the last one finishes instead of after each. You can keep chatting meanwhile, and a job that runs much longer doesn't hold the others back for more than 2 minutes.
 - Regular commands time out after 2 minutes, unless Pi asks for longer (up to 10), so Pi never hangs on a stuck command. Commands that start their own background process with `&` are left alone.
 
 You don't need to do anything differently: Pi decides when a job belongs in the background. You can also ask for it, for example "run the tests in the background and tell me when they're done".
