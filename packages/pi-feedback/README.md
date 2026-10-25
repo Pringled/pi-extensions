@@ -1,6 +1,6 @@
 # pi-feedback
 
-Give [Pi](https://pi.dev) feedback on its changes: look through them in a GitHub-style view in your browser, leave comments on lines, and send them all back to Pi in one go. The view is [difit](https://github.com/yoshiko-pg/difit).
+Give [Pi](https://pi.dev) feedback on its changes: look through them in a GitHub-style view in your browser, leave comments on lines, and send them all back to Pi in one go.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-feedback-dark.gif">
@@ -10,6 +10,8 @@ Give [Pi](https://pi.dev) feedback on its changes: look through them in a GitHub
 ```bash
 pi install npm:pi-feedback
 ```
+
+This also installs [difit](https://github.com/yoshiko-pg/difit), which draws the review page in your browser (about 235 MB with its own dependencies).
 
 ## Usage
 

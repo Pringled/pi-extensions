@@ -35,7 +35,7 @@
     ]
   },
   "dependencies": {
-    "difit": "^5.0.12"
+    "difit": "5.0.12"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
