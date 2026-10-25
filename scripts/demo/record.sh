@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Records the README demos (assets/images/pi-*-{dark,light}.gif and .png) from the tapes in this folder.
-# Pass demo names (full, polish, background, model-pick, context-bar, checkpoints, review, next-prompt, away, heads-up) to record only those, and THEMES=dark or THEMES=light for one theme. Uses your pi login. Set PI_PREFIX to wrap pi in a sandbox, e.g. PI_PREFIX="nono run --profile pi --allow-cwd --allow $TMPDIR --".
+# Pass demo names (full, polish, background, model-pick, context-bar, checkpoints, feedback, next-prompt, away, heads-up) to record only those, and THEMES=dark or THEMES=light for one theme. Uses your pi login. Set PI_PREFIX to wrap pi in a sandbox, e.g. PI_PREFIX="nono run --profile pi --allow-cwd --allow $TMPDIR --".
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -11,7 +11,7 @@ agent="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 provider="${DEMO_PROVIDER:-github-copilot}"
 model="${DEMO_MODEL:-claude-opus-5.5}"
 demos=("$@")
-[ $# -eq 0 ] && demos=(full polish background model-pick context-bar checkpoints review next-prompt away heads-up)
+[ $# -eq 0 ] && demos=(full polish background model-pick context-bar checkpoints feedback next-prompt away heads-up)
 
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
@@ -22,7 +22,7 @@ root=$(cd "$root" && pwd -P)
 (cd packages/pi-polish && npm install --omit=peer --no-audit --no-fund --silent)
 cp -R packages "$root/packages"
 export PI_PREFIX="${PI_PREFIX:-}"
-export PI_FLAGS="--no-session --no-extensions -e $root/packages/pi-polish -e $root/packages/pi-background -e $root/packages/pi-model-pick -e $root/packages/pi-context-bar -e $root/packages/pi-checkpoints -e $root/packages/pi-browser-review -e $root/packages/pi-next-prompt -e $root/packages/pi-away -e $root/packages/pi-heads-up"
+export PI_FLAGS="--no-session --no-extensions -e $root/packages/pi-polish -e $root/packages/pi-background -e $root/packages/pi-model-pick -e $root/packages/pi-context-bar -e $root/packages/pi-checkpoints -e $root/packages/pi-feedback -e $root/packages/pi-next-prompt -e $root/packages/pi-away -e $root/packages/pi-heads-up"
 
 # Each demo and theme gets its own $HOME with a fresh copy of the stats project and only these extensions loaded.
 # The light tapes are the dark ones with the light style and file names.
@@ -48,8 +48,8 @@ EOF
   pids+=($!)
 done; done
 for pid in "${pids[@]}"; do wait "$pid"; done
-# The review demo's browser half is recorded separately and spliced into its terminal recording
-if [[ " ${demos[*]} " == *" review "* ]]; then
-  for theme in ${THEMES:-dark light}; do scripts/demo/review/splice.sh "$theme"; done
+# The feedback demo's browser half is recorded separately and spliced into its terminal recording
+if [[ " ${demos[*]} " == *" feedback "* ]]; then
+  for theme in ${THEMES:-dark light}; do scripts/demo/feedback/splice.sh "$theme"; done
 fi
 echo "Recorded ${demos[*]} (${THEMES:-dark light}) to assets/images"

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stands in for the browser in the feedback demo: leaves the comment from comments.json on the diff, then presses Send to Pi
+url="${1%/}"
+(sleep 2 && curl -s -X POST -H "Content-Type: application/json" "$url/api/comment-imports" -d @"$(dirname "$0")/comments.json" >/dev/null &&
+	sleep 3 && curl -s -X POST -H "x-pi-feedback: send" "$url/__pi-feedback/send" >/dev/null) &

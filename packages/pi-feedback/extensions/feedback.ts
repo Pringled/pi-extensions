@@ -3,7 +3,7 @@ import { createServer, request, type Server } from "node:http";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const RULE = "=".repeat(50);
-const SEND_PATH = "/__pi-review/send";
+const SEND_PATH = "/__pi-feedback/send";
 // A self-contained floating button, so it doesn't depend on how difit builds its page
 const BUTTON = `<script>(() => {
 	const b = document.createElement("button");
@@ -14,7 +14,7 @@ const BUTTON = `<script>(() => {
 		b.disabled = true;
 		b.textContent = "Sending…";
 		await new Promise((r) => setTimeout(r, 400));
-		const res = await fetch("${SEND_PATH}", { method: "POST", headers: { "x-pi-review": "send" } }).catch(() => undefined);
+		const res = await fetch("${SEND_PATH}", { method: "POST", headers: { "x-pi-feedback": "send" } }).catch(() => undefined);
 		b.textContent = res?.ok ? "Sent to Pi" : "Couldn't reach Pi";
 		b.disabled = Boolean(res?.ok);
 	};
@@ -27,7 +27,7 @@ export function startProxy(target: URL, onSend: () => void): Promise<Server> {
 		// Only this machine's own addresses, so a website can't reach the review through DNS rebinding
 		if (!/^(127\.0\.0\.1|localhost):\d+$/.test(req.headers.host ?? "")) return void res.writeHead(403).end();
 		// The header makes browsers block requests from other sites, so they can't end the review
-		if (req.method === "POST" && req.url === SEND_PATH && req.headers["x-pi-review"] === "send") {
+		if (req.method === "POST" && req.url === SEND_PATH && req.headers["x-pi-feedback"] === "send") {
 			onSend();
 			return void res.writeHead(204).end();
 		}
@@ -81,12 +81,12 @@ export default function (pi: ExtensionAPI) {
 		return undefined;
 	};
 
-	pi.registerCommand("review", {
-		description: "Review your changes in the browser with difit; send your line comments to Pi with the button there or /review again. Optionally pass the branch to compare with",
+	pi.registerCommand("feedback", {
+		description: "Give Pi feedback on its changes: comment on lines in a GitHub-style view in your browser, then send them with Send to Pi there or /feedback again. Optionally pass the branch to compare with",
 		handler: async (args, ctx) => {
-			// A second /review finishes the open one; difit prints the comments on its way out
+			// A second /feedback finishes the open one; difit prints the comments on its way out
 			if (review) return review.stop();
-			if (!(await git(ctx.cwd, "rev-parse", "--is-inside-work-tree"))) return ctx.ui.notify("/review needs a git repository", "error");
+			if (!(await git(ctx.cwd, "rev-parse", "--is-inside-work-tree"))) return ctx.ui.notify("/feedback needs a git repository", "error");
 
 			// Everything on this branch since it left the base, uncommitted changes and new files included
 			const base = args.trim() || (await defaultBase(ctx.cwd));
@@ -110,7 +110,7 @@ export default function (pi: ExtensionAPI) {
 
 			const done = () => {
 				review = undefined;
-				ctx.ui.setWidget("review", undefined);
+				ctx.ui.setWidget("feedback", undefined);
 				proxy?.closeAllConnections();
 				proxy?.close();
 				// One at a time, so a file deleted meanwhile doesn't stop the others
@@ -119,7 +119,7 @@ export default function (pi: ExtensionAPI) {
 			child.on("error", (err: NodeJS.ErrnoException) => {
 				done();
 				const hint = err.code === "ENOENT" ? "difit isn't installed; install it with: npm install -g difit" : err.message;
-				ctx.ui.notify(`/review: ${hint}`, "error");
+				ctx.ui.notify(`/feedback: ${hint}`, "error");
 			});
 			child.stderr?.on("data", (d: Buffer) => (output += d.toString()));
 			child.stdout?.on("data", (d: Buffer) => {
@@ -139,9 +139,9 @@ export default function (pi: ExtensionAPI) {
 						const page = `http://127.0.0.1:${typeof address === "object" && address ? address.port : ""}`;
 						// Opening the browser can fail, for example in a sandbox; the address is shown either way
 						void pi.exec(process.platform === "darwin" ? "open" : "xdg-open", [page]).catch(() => {});
-						ctx.ui.setWidget("review", (_tui, theme) => ({
+						ctx.ui.setWidget("feedback", (_tui, theme) => ({
 							invalidate() {},
-							render: () => [theme.fg("dim", ` ◆ Reviewing in the browser at ${page}; press Send to Pi there or run /review again`)],
+							render: () => [theme.fg("dim", ` ◆ Reviewing in the browser at ${page}; press Send to Pi there or run /feedback again`)],
 						}));
 					});
 				}
@@ -151,11 +151,11 @@ export default function (pi: ExtensionAPI) {
 				done();
 				if (empty) return;
 				const comments = reviewComments(output);
-				if (comments) pi.sendUserMessage(`Here are my review comments on the changes${base ? ` against ${base}` : ""}:\n\n${comments}`, { deliverAs: "followUp" });
+				if (comments) pi.sendUserMessage(`Here's my feedback on the changes${base ? ` against ${base}` : ""}:\n\n${comments}`, { deliverAs: "followUp" });
 				// difit mentioned comments in a form this doesn't recognise, so say so rather than lose them quietly
-				else if (/comment/i.test(output.slice(stoppedAt))) ctx.ui.notify("/review couldn't read difit's comments; copy them with Copy All Prompt in difit instead", "warning");
-				else if (code === 0) ctx.ui.notify("Review closed without comments", "info");
-				else ctx.ui.notify(`/review: difit stopped (exit ${code}). ${output.trim().split("\n").at(-1) ?? ""}`, "error");
+				else if (/comment/i.test(output.slice(stoppedAt))) ctx.ui.notify("/feedback couldn't read difit's comments; copy them with Copy All Prompt in difit instead", "warning");
+				else if (code === 0) ctx.ui.notify("No feedback sent: you didn't leave any comments", "info");
+				else ctx.ui.notify(`/feedback: difit stopped (exit ${code}). ${output.trim().split("\n").at(-1) ?? ""}`, "error");
 			});
 		},
 	});

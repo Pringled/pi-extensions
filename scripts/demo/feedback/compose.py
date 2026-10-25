@@ -1,4 +1,4 @@
-# Splices the browser half of the review demo into the terminal recording, at the pause after the first /review.
+# Splices the browser half of the feedback demo into the terminal recording, at the pause after the first /feedback.
 # Usage: uv run --with pillow python compose.py <terminal.gif> <browser frames dir> <out.gif>
 import hashlib
 import json

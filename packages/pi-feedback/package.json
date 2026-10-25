@@ -1,10 +1,10 @@
 {
-  "name": "pi-browser-review",
+  "name": "pi-feedback",
   "version": "0.1.0",
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
-  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-browser-review#readme",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-feedback#readme",
   "bugs": {
     "url": "https://github.com/pringled/pi-extensions/issues"
   },
@@ -13,12 +13,13 @@
     "README.md",
     "LICENSE"
   ],
-  "description": "Review Pi's changes in a GitHub-style browser view with difit and send your line comments back to Pi with /review",
+  "description": "Give Pi feedback on its changes: comment on lines in a GitHub-style browser view with difit and send them back with /feedback",
   "keywords": [
     "pi-package",
     "pi",
     "pi-coding-agent",
     "review",
+    "feedback",
     "diff",
     "difit",
     "code-review"
@@ -26,11 +27,11 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pringled/pi-extensions.git",
-    "directory": "packages/pi-browser-review"
+    "directory": "packages/pi-feedback"
   },
   "pi": {
     "extensions": [
-      "./extensions/review.ts"
+      "./extensions/feedback.ts"
     ]
   },
   "peerDependencies": {

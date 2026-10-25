@@ -1,4 +1,4 @@
-// Records the browser half of the review demo: difit behind the extension's proxy at <url>, with one comment typed on the median function and sent with Send to Pi.
+// Records the browser half of the feedback demo: difit behind the extension's proxy at <url>, with one comment typed on the median function and sent with Send to Pi.
 // Usage: node browser.mjs <url> <theme: dark|light> <comment> <out dir>. Writes frame PNGs and frames.json ([{file, seconds}]).
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -16,7 +16,7 @@ const configPath = join(homedir(), ".difit", "config.json");
 const savedConfig = existsSync(configPath) ? readFileSync(configPath, "utf8") : undefined;
 const chrome = spawn(
 	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-	["--headless=new", "--hide-scrollbars", "--remote-debugging-port=9335", `--user-data-dir=${mkdtempSync(join(tmpdir(), "review-demo-"))}`, "about:blank"],
+	["--headless=new", "--hide-scrollbars", "--remote-debugging-port=9335", `--user-data-dir=${mkdtempSync(join(tmpdir(), "feedback-demo-"))}`, "about:blank"],
 	{ stdio: "ignore" },
 );
 
