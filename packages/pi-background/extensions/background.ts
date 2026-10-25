@@ -12,6 +12,8 @@ const BASH_MAX_TIMEOUT = 600;
 const WAKE_DEBOUNCE_MS = 1000;
 const MAX_WAKES = 10;
 const MAX_SHOWN_JOBS = 3;
+// How long finished results wait for jobs started alongside them before Pi is woken anyway
+const GROUP_HOLD_MS = 2 * 60_000;
 
 interface Job {
 	id: string;
@@ -24,6 +26,10 @@ interface Job {
 	ended?: number;
 	// The latest output line, shown while the job runs
 	lastLine?: string;
+	// The turn that started the job; jobs from the same turn are reported together
+	group: number;
+	// Started with wake_on, so it may run indefinitely and doesn't hold back the others
+	watched: boolean;
 }
 
 function tail(path: string, lines: number): string {
@@ -79,8 +85,39 @@ export default function (pi: ExtensionAPI) {
 	const ops = createLocalBashOperations();
 	let next = 1;
 
-	const wake = (content: string, details: { headline: string; last: string; error: boolean }) =>
-		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn: true, deliverAs: "followUp" });
+	const wake = (content: string, details: { headline: string; last: string; error: boolean }, triggerTurn = true) =>
+		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "followUp" });
+
+	// Jobs started in the same turn usually belong together, like several benchmarks to compare. While some of them
+	// still run, a finished one's result is added to the conversation without waking Pi, so it answers once at the end
+	// instead of after each job. A job that runs on too long doesn't hold the others back for more than GROUP_HOLD_MS.
+	let turn = 0;
+	pi.on("turn_start", async () => {
+		turn++;
+	});
+	const holds = new Map<number, NodeJS.Timeout>();
+	const runningInGroup = (job: Job) =>
+		[...jobs.values()].filter((other) => other !== job && other.group === job.group && other.status === "running" && !other.watched);
+	const report = (job: Job, content: string, details: { headline: string; last: string; error: boolean }) => {
+		const others = job.watched ? [] : runningInGroup(job);
+		if (others.length === 0) {
+			clearTimeout(holds.get(job.group));
+			holds.delete(job.group);
+			return wake(content, details);
+		}
+		wake(`${content}\n(Still running from the same turn: ${others.map((other) => other.id).join(", ")}; you'll be woken when they finish.)`, details, false);
+		if (holds.has(job.group)) return;
+		holds.set(job.group, setTimeout(() => {
+			holds.delete(job.group);
+			const still = runningInGroup(job);
+			if (still.length === 0) return;
+			wake(`Background jobs from the same turn are still running after ${GROUP_HOLD_MS / 60_000} minutes: ${still.map((other) => other.id).join(", ")}. The results of the ones that finished are above; you'll get a message when each of these finishes.`, {
+				headline: `${still.map((other) => other.id).join(", ")} still running`,
+				last: "",
+				error: false,
+			});
+		}, GROUP_HOLD_MS));
+	};
 
 	// Wakes the agent with output lines matching pattern, batched per second and capped per job
 	const watcher = (job: Job, pattern: RegExp) => {
@@ -209,7 +246,7 @@ export default function (pi: ExtensionAPI) {
 			mkdirSync(dir, { recursive: true });
 			const log = join(dir, `${process.pid}-${id}.log`);
 			const out = createWriteStream(log);
-			const job: Job = { id, command: params.command, log, started: Date.now(), controller: new AbortController(), status: "running" };
+			const job: Job = { id, command: params.command, log, started: Date.now(), controller: new AbortController(), status: "running", group: turn, watched: Boolean(pattern) };
 			jobs.set(id, job);
 
 			const watch = pattern ? watcher(job, pattern) : undefined;
@@ -237,7 +274,7 @@ export default function (pi: ExtensionAPI) {
 					out.end(() => {
 						// A kill from session shutdown has no session left to notify
 						if (job.status === "killed" && !jobs.has(id)) return;
-						wake(`Background job finished: ${summary(job)}\nLast lines:\n${tail(log, TAIL_LINES)}`, {
+						report(job, `Background job finished: ${summary(job)}\nLast lines:\n${tail(log, TAIL_LINES)}`, {
 							headline: `${id} ${job.status === "exited" ? `exited ${job.exitCode}` : job.status} · ${elapsed(job)}`,
 							last: tail(log, 1),
 							error: job.status !== "exited" || job.exitCode !== 0,
@@ -289,6 +326,8 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_shutdown", async () => {
+		for (const timer of holds.values()) clearTimeout(timer);
+		holds.clear();
 		for (const job of jobs.values()) {
 			if (job.status === "running") job.controller.abort();
 		}
