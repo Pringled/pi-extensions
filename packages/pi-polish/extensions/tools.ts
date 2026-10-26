@@ -56,13 +56,17 @@ const DIFF_PREVIEW_LINES = 16;
 const BG_RESET = "\x1b[49m";
 const FG_RESET = "\x1b[39m";
 
-type Kind = "bash" | "read" | "search" | "list";
-const KIND_OF: Record<string, Kind> = { bash: "bash", read: "read", grep: "search", find: "search", ls: "list" };
+type Kind = "bash" | "read" | "search" | "list" | "tools" | "mcp";
+const KIND_OF: Record<string, Kind> = { bash: "bash", read: "read", grep: "search", find: "search", ls: "list", tool_search: "tools" };
+// Pi names MCP tools mcp__<server>__<tool>
+const kindOf = (toolName: string): Kind | undefined => KIND_OF[toolName] ?? (toolName.startsWith("mcp__") ? "mcp" : undefined);
 const VERBS: Record<Kind, [done: string, running: string, one: string, many: string]> = {
 	bash: ["Ran", "Running", "shell command", "shell commands"],
 	read: ["Read", "Reading", "file", "files"],
 	search: ["Searched", "Searching", "pattern", "patterns"],
 	list: ["Listed", "Listing", "directory", "directories"],
+	tools: ["Ran", "Running", "tool search", "tool searches"],
+	mcp: ["Called", "Calling", "MCP tool", "MCP tools"],
 };
 
 interface Member {
@@ -105,8 +109,16 @@ function label(toolName: string, args: any, cwd: string): string {
 			return `Search "${args?.pattern ?? ""}"${args?.path ? ` in ${shortPath(args.path, cwd)}` : ""}`;
 		case "find":
 			return `Find "${args?.pattern ?? ""}"${args?.path ? ` in ${shortPath(args.path, cwd)}` : ""}`;
-		default:
+		case "tool_search":
+			return `Search tools "${args?.query ?? ""}"`;
+		case "ls":
 			return `List ${args?.path ? shortPath(args.path, cwd) : "."}`;
+		default: {
+			// server/tool like pi's own MCP rows, with the first text argument, which is usually the query
+			const [, server, ...tool] = toolName.split("__");
+			const first = Object.values(args ?? {}).find((v) => typeof v === "string") as string | undefined;
+			return `${server}/${tool.join("__")}${first ? ` "${first.split("\n")[0]}"` : ""}`;
+		}
 	}
 }
 
@@ -437,7 +449,7 @@ export default function (pi: ExtensionAPI) {
 
 	const assign = (id: string, toolName: string, args: unknown, done = false, error = false): Group => {
 		current ??= { members: [], started: Date.now() };
-		current.members.push({ id, kind: KIND_OF[toolName], label: label(toolName, args, cwd), done, error });
+		current.members.push({ id, kind: kindOf(toolName)!, label: label(toolName, args, cwd), done, error });
 		groupOf.set(id, current);
 		return current;
 	};
@@ -460,7 +472,7 @@ export default function (pi: ExtensionAPI) {
 			for (const part of msg.content ?? []) {
 				if (part.type === "text" && part.text.trim()) current = undefined;
 				if (part.type !== "toolCall") continue;
-				if (KIND_OF[part.name]) assign(part.id, part.name, part.arguments, true);
+				if (kindOf(part.name)) assign(part.id, part.name, part.arguments, true);
 				else current = undefined;
 			}
 		}
@@ -492,7 +504,7 @@ export default function (pi: ExtensionAPI) {
 		if (msg.role === "assistant" && (msg.content ?? []).some((c: any) => c.type === "text" && c.text.trim())) current = undefined;
 	});
 	pi.on("tool_execution_start", async (event) => {
-		if (!KIND_OF[event.toolName]) {
+		if (!kindOf(event.toolName)) {
 			current = undefined;
 			return;
 		}
@@ -599,7 +611,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 	};
 	// Only the drawing changes: pi's own tools keep running, with their own schema and on/off state
-	pi.registerToolRenderer((toolName, next) => renderers[toolName] ?? next());
+	pi.registerToolRenderer((toolName, next) => renderers[toolName] ?? (kindOf(toolName) ? groupedTool(toolName) : next()));
 
 	// pi only lists a tool's guidelines while the tool is on
 	pi.on("before_agent_start", async (event) => {

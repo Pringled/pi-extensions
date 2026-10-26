@@ -107,8 +107,10 @@ export default function (pi: ExtensionAPI) {
 				return "Starting a background job";
 			case "questionnaire":
 				return "Waiting for your answer";
+			case "tool_search":
+				return "Searching tools";
 			default:
-				return `Running ${name}`;
+				return name.startsWith("mcp__") ? `Calling ${name.split("__")[1]}/${name.split("__").slice(2).join("__")}` : `Running ${name}`;
 		}
 	};
 	pi.on("session_start", async (_event, ctx) => {
