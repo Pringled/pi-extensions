@@ -425,7 +425,7 @@ function empty() {
 	return new Container();
 }
 
-/** Lines cut to the screen width instead of wrapping; the first line keeps its suffix (failures and the expand hint) in view. */
+/** Lines cut to the screen width instead of wrapping; the first line keeps its failure note in view. */
 function oneLine(lines: string[], suffix = ""): Component {
 	return {
 		invalidate() {},
@@ -448,7 +448,7 @@ export default function (pi: ExtensionAPI) {
 
 	const tick = (group: Group) => {
 		const running = group.members.some((m) => !m.done);
-		if (running && !group.timer) group.timer = setInterval(() => rowInvalidate.get(group.members[0].id)?.(), 1000);
+		if (running && !group.timer) group.timer = setInterval(() => rowInvalidate.get(group.members[0].id)?.(), 500);
 		if (!running && group.timer) {
 			clearInterval(group.timer);
 			group.timer = undefined;
@@ -547,23 +547,26 @@ export default function (pi: ExtensionAPI) {
 		if (running) {
 			const secs = Math.round((Date.now() - group.started) / 1000);
 			const active = [...group.members].reverse().find((m) => !m.done) ?? group.members[group.members.length - 1];
-			const head = theme.fg("accent", `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
+			// The dot pulses every half second while the group runs, like a cursor blink
+			const pulse = Math.floor(Date.now() / 500) % 2 ? "dim" : "accent";
+			const head = theme.fg(pulse, `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
 			return oneLine([head, theme.fg("dim", `  └ ${active.label}`)]);
 		}
-		const hint = theme.fg("dim", `  (${keyHint("app.tools.expand", "expand")})`);
-		const mark = theme.fg(failed ? "error" : "success", `${MARK} `);
+		// Finished rows go quiet, like Claude Code's: dim text, with a red ● only when something failed
+		const mark = failed ? theme.fg("error", `${MARK} `) : "  ";
 		const text = group.members.length === 1 ? group.members[0].label : summary(group, false);
-		return oneLine([mark + theme.fg("toolTitle", text)], failNote + hint);
+		return oneLine([mark + theme.fg("dim", text)], failNote);
 	};
 
 	// The ● carries the status, like Claude Code: dim while arguments stream, accent while running, green or red when done.
 	// History rows redrawn after /reload have no execution state, so they count as done.
-	const dot = (theme: any, context: { isPartial?: boolean; isError?: boolean; executionStarted?: boolean }) => {
-		if (context.isError) return theme.fg("error", `${MARK} `);
-		if (context.executionStarted && context.isPartial) return theme.fg("accent", `${MARK} `);
-		if (!context.executionStarted && live) return theme.fg("dim", `${MARK} `);
-		return theme.fg("success", `${MARK} `);
+	const status = (context: { isPartial?: boolean; isError?: boolean; executionStarted?: boolean }) => {
+		if (context.isError) return "error";
+		if (context.executionStarted && context.isPartial) return "accent";
+		if (!context.executionStarted && live) return "dim";
+		return "success";
 	};
+	const dot = (theme: any, context: any) => theme.fg(status(context), `${MARK} `);
 
 	const groupedTool = (toolName: string): ToolRenderers => ({
 		renderShell: "self",
@@ -573,12 +576,14 @@ export default function (pi: ExtensionAPI) {
 			// Expanded, a shell command shows in full, with its cd and every line; collapsed rows keep the short label
 			const command = context.expanded && toolName === "bash" ? String(args?.command ?? "").trim().split("\n") : undefined;
 			const text = command ? `$ ${command.slice(0, 60).join("\n")}${command.length > 60 ? `\n... ${command.length - 60} more lines` : ""}` : truncateToWidth(label(toolName, args, cwd), 400);
-			const mark = dot(theme, context);
+			// Finished rows are dim without a dot; running and failed ones keep it
+			const done = status(context) === "success";
+			const mark = done ? "  " : dot(theme, context);
 			// Wrapped lines continue under the text, past the dot, instead of at the left edge
 			return {
 				invalidate() {},
 				render: (width: number) =>
-					wrapTextWithAnsi(text, Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + theme.fg("toolTitle", line)),
+					wrapTextWithAnsi(text, Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + theme.fg(done ? "dim" : "toolTitle", line)),
 			};
 		},
 		renderResult(result, { expanded }, theme) {
