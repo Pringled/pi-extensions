@@ -12,7 +12,7 @@ export default function (pi: ExtensionAPI) {
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let pending: AbortController | undefined;
 
-	// Dimmed, with the recap wrapped to line up after its label
+	// Dimmed, with the recap wrapped to line up after its label. A blank line above keeps it apart from other widgets, such as pi-polish's turn summary
 	const show = (ctx: ExtensionContext, recap: string | undefined) =>
 		ctx.ui.setWidget(
 			"recap",
@@ -22,9 +22,12 @@ export default function (pi: ExtensionAPI) {
 						render(width: number) {
 							const label = "※ recap: ";
 							const indent = 1 + visibleWidth(label);
-							return wrapTextWithAnsi(recap, Math.max(10, width - indent - 1)).map((line, i) =>
-								theme.fg("dim", (i === 0 ? ` ${label}` : " ".repeat(indent)) + line),
-							);
+							return [
+								"",
+								...wrapTextWithAnsi(recap, Math.max(10, width - indent - 1)).map((line, i) =>
+									theme.fg("dim", (i === 0 ? ` ${label}` : " ".repeat(indent)) + line),
+								),
+							];
 						},
 					})
 				: undefined,
