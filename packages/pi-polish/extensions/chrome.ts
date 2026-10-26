@@ -1,5 +1,5 @@
 import { AssistantMessageComponent, CustomEditor, type ExtensionAPI, UserMessageComponent } from "@earendil-works/pi-coding-agent";
-import { Markdown } from "@earendil-works/pi-tui";
+import { Markdown, MouseRegion, Spacer, Text } from "@earendil-works/pi-tui";
 
 const PROMPT = "❯";
 const REPLY = "●";
@@ -26,16 +26,20 @@ function patchOnce(proto: any, method: string, wrap: (original: (...args: any[])
 
 export default function (pi: ExtensionAPI) {
 	try {
-		// Drop hidden thinking blocks entirely instead of rendering a "Thinking..." line plus spacers
 		patchOnce(AssistantMessageComponent.prototype, "updateContent", (original) =>
 			function (this: any, message: any, ...rest: any[]) {
 				// Two columns of padding so reply text lines up behind the ● marker, like tool rows
 				this.outputPad = Math.max(this.outputPad ?? 1, 2);
-				if (!this.hideThinkingBlock) original.call(this, message, ...rest);
-				else {
-					original.call(this, { ...message, content: message.content.filter((c: any) => c.type !== "thinking") }, ...rest);
-					this.lastMessage = message;
-				}
+				original.call(this, message, ...rest);
+				// Hidden thinking draws nothing instead of a "Thinking..." line plus spacers. Its rows stay in place,
+				// so extensions that read pi's layout, like pi-stereo-view, still match it
+				// A block collapsed by clicking it while thinking is shown keeps its line, so it can be clicked open again
+				const children: any[] = this.hideThinkingBlock ? (this.contentContainer?.children ?? []) : [];
+				children.forEach((child, i) => {
+					if (!(child instanceof MouseRegion) || !((child as any).child instanceof Text)) return;
+					const spacer = [children[i + 1], children[i - 1]].find((c) => c instanceof Spacer);
+					for (const row of [child, spacer]) if (row) row.render = () => [];
+				});
 				// Text blocks are the Markdown children without a default style; thinking blocks carry one
 				for (const child of this.contentContainer?.children ?? []) {
 					if (!(child instanceof Markdown) || (child as any).defaultTextStyle !== undefined || (child as any)[patched]) continue;
