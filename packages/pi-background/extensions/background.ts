@@ -393,6 +393,15 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	// After /reload or a resume, carry on after the ids already in the conversation so "bg3" keeps meaning one job
+	pi.on("session_start", async (_event, ctx) => {
+		for (const entry of ctx.sessionManager.getBranch()) {
+			const msg = entry.type === "message" ? (entry.message as any) : undefined;
+			const n = Number(/^bg(\d+)$/.exec(msg?.role === "toolResult" && msg.toolName === "bg_run" ? String(msg.details?.id) : "")?.[1]);
+			if (n >= next) next = n + 1;
+		}
+	});
+
 	pi.on("session_shutdown", async () => {
 		for (const timer of holds.values()) clearTimeout(timer);
 		holds.clear();
