@@ -1,5 +1,6 @@
 import { AssistantMessageComponent, CustomEditor, type ExtensionAPI, UserMessageComponent } from "@earendil-works/pi-coding-agent";
 import { Markdown, MouseRegion, Spacer, Text } from "@earendil-works/pi-tui";
+import { shortCommand } from "./command.ts";
 
 const PROMPT = "❯";
 const REPLY = "●";
@@ -93,7 +94,7 @@ export default function (pi: ExtensionAPI) {
 		const path = String(args?.path ?? "").split("/").pop();
 		switch (name) {
 			case "bash":
-				return `Running ${String(args?.command ?? "").split("\n")[0].slice(0, 60)}`;
+				return `Running ${shortCommand(String(args?.command ?? ""), process.cwd()).slice(0, 60)}`;
 			case "read":
 				return `Reading ${path}`;
 			case "edit":

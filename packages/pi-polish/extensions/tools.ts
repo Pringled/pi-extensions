@@ -7,7 +7,8 @@ import {
 	type ExtensionAPI,
 	type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
-import { type Component, Container, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { type Component, Container, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { shortCommand } from "./command.ts";
 import bash from "@shikijs/langs/shellscript";
 import css from "@shikijs/langs/css";
 import c from "@shikijs/langs/c";
@@ -102,7 +103,7 @@ function shortPath(path: unknown, cwd: string): string {
 function label(toolName: string, args: any, cwd: string): string {
 	switch (toolName) {
 		case "bash":
-			return `$ ${String(args?.command ?? "").split("\n")[0]}`;
+			return `$ ${shortCommand(String(args?.command ?? ""), cwd)}`;
 		case "read":
 			return `Read ${shortPath(args?.path, cwd)}`;
 		case "grep":
@@ -424,6 +425,14 @@ function empty() {
 	return new Container();
 }
 
+/** Lines cut to the screen width instead of wrapping; the first line keeps its suffix (failures and the expand hint) in view. */
+function oneLine(lines: string[], suffix = ""): Component {
+	return {
+		invalidate() {},
+		render: (width: number) => lines.map((line, i) => (i === 0 ? truncateToWidth(line, Math.max(10, width - visibleWidth(suffix))) + suffix : truncateToWidth(line, width))),
+	};
+}
+
 export default function (pi: ExtensionAPI) {
 	const cwd = process.cwd();
 	const groupOf = new Map<string, Group>();
@@ -539,12 +548,12 @@ export default function (pi: ExtensionAPI) {
 			const secs = Math.round((Date.now() - group.started) / 1000);
 			const active = [...group.members].reverse().find((m) => !m.done) ?? group.members[group.members.length - 1];
 			const head = theme.fg("accent", `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
-			return new Text(`${head}\n${theme.fg("dim", `  └ ${active.label}`)}`, 0, 0);
+			return oneLine([head, theme.fg("dim", `  └ ${active.label}`)]);
 		}
 		const hint = theme.fg("dim", `  (${keyHint("app.tools.expand", "expand")})`);
 		const mark = theme.fg(failed ? "error" : "success", `${MARK} `);
 		const text = group.members.length === 1 ? group.members[0].label : summary(group, false);
-		return new Text(mark + theme.fg("toolTitle", text) + failNote + hint, 0, 0);
+		return oneLine([mark + theme.fg("toolTitle", text)], failNote + hint);
 	};
 
 	// The ● carries the status, like Claude Code: dim while arguments stream, accent while running, green or red when done.
@@ -561,8 +570,16 @@ export default function (pi: ExtensionAPI) {
 		renderCall(args: any, theme, context) {
 			const grouped = renderGrouped(context.toolCallId, theme, context);
 			if (grouped) return grouped;
-			const text = truncateToWidth(label(toolName, args, cwd), 400);
-			return new Text(dot(theme, context) + theme.fg("toolTitle", text), 0, 0);
+			// Expanded, a shell command shows in full, with its cd and every line; collapsed rows keep the short label
+			const command = context.expanded && toolName === "bash" ? String(args?.command ?? "").trim().split("\n") : undefined;
+			const text = command ? `$ ${command.slice(0, 60).join("\n")}${command.length > 60 ? `\n... ${command.length - 60} more lines` : ""}` : truncateToWidth(label(toolName, args, cwd), 400);
+			const mark = dot(theme, context);
+			// Wrapped lines continue under the text, past the dot, instead of at the left edge
+			return {
+				invalidate() {},
+				render: (width: number) =>
+					wrapTextWithAnsi(text, Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + theme.fg("toolTitle", line)),
+			};
 		},
 		renderResult(result, { expanded }, theme) {
 			if (!expanded) return empty();
