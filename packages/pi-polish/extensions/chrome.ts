@@ -159,6 +159,10 @@ export default function (pi: ExtensionAPI) {
 		const done = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 		ctx.ui.setWidget("pi-polish-turn", (_tui, theme) => new Text(theme.fg("dim", `✻ Worked for ${took} · done ${done}`), 0, 0));
 	});
+	// A jump in the session tree leaves the turn behind, so its summary goes too
+	pi.on("session_tree", async (_event, ctx) => {
+		if (ctx.hasUI) ctx.ui.setWidget("pi-polish-turn", undefined);
+	});
 	pi.on("session_shutdown", async () => clearInterval(timer));
 
 	// ❯ before the input: two columns of editor padding, with the marker drawn into the first content line
