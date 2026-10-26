@@ -36,31 +36,35 @@ export default function (pi: ExtensionAPI) {
 		const controller = new AbortController();
 		pending = controller;
 		const level = pi.getThinkingLevel();
+		const model = ctx.model;
 		const ask: AgentMessage = { role: "user", content: [{ type: "text", text: PROMPT }], timestamp: Date.now() };
-		try {
-			const answer = await ctx.modelRegistry
-				.streamSimple(ctx.model, normalizeContext({ messages: convertToLlm([...lastRequest, reply, ask]) }), {
-					// The same thinking level as the session, because changing it would miss the prompt cache
-					reasoning: ctx.model.reasoning && level !== "off" ? level : undefined,
-					maxTokens: 2000,
-					sessionId: ctx.sessionManager.getSessionId(),
-					signal: controller.signal,
-				})
-				.result();
-			if (controller.signal.aborted || answer.stopReason !== "stop") return;
-			const text = answer.content
-				.map((part) => (part.type === "text" ? part.text : ""))
-				.join("")
-				.trim()
-				.replace(/^["'`]|["'`]$/g, "");
-			if (!text || text.includes("\n") || text.length > MAX_LENGTH) return;
-			suggestion = text;
-			redraw();
-		} catch {
-			// A suggestion is optional, so failures stay quiet
-		} finally {
-			if (pending === controller) pending = undefined;
-		}
+		// Not awaited: pi keeps its working line up until every agent_end handler returns
+		void (async () => {
+			try {
+				const answer = await ctx.modelRegistry
+					.streamSimple(model, normalizeContext({ messages: convertToLlm([...lastRequest, reply, ask]) }), {
+						// The same thinking level as the session, because changing it would miss the prompt cache
+						reasoning: model.reasoning && level !== "off" ? level : undefined,
+						maxTokens: 2000,
+						sessionId: ctx.sessionManager.getSessionId(),
+						signal: controller.signal,
+					})
+					.result();
+				if (controller.signal.aborted || answer.stopReason !== "stop") return;
+				const text = answer.content
+					.map((part) => (part.type === "text" ? part.text : ""))
+					.join("")
+					.trim()
+					.replace(/^["'`]|["'`]$/g, "");
+				if (!text || text.includes("\n") || text.length > MAX_LENGTH) return;
+				suggestion = text;
+				redraw();
+			} catch {
+				// A suggestion is optional, so failures stay quiet
+			} finally {
+				if (pending === controller) pending = undefined;
+			}
+		})();
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
