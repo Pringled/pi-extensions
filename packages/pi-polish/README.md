@@ -15,7 +15,7 @@ pi install npm:pi-polish
 
 - Shell commands, file reads, searches and MCP tool calls in a row fold into one line that updates while they run (`Running 2 shell commands… · 5s`) and then sums them up (`Ran 3 shell commands, read 2 files` or `Called 2 MCP tools`). `ctrl+o` shows the full output.
 - Edits and new files show as diffs with syntax highlighting and the changed words marked, in colors that follow your Pi theme, dark or light.
-- Reads, searches, shell commands and MCP calls show an orange dot while they run, then turn into a quiet grey row once done, with a red dot if one failed. Edits and writes keep a green dot with their diff.
+- Reads, searches, shell commands and MCP calls show a pulsing dot in your theme's accent color while they run, then turn into a quiet grey row once done, with a red dot if one failed. Edits and writes keep a green dot with their diff.
 - An orange status line shows what Pi is doing, how long it has been at it and how many tokens it has written. When Pi finishes, a dim line says how long it worked and when it was done.
 - `❯` marks your messages and `●` marks Pi's replies.
 - A short instruction to the model to change files with Pi's edit and write tools instead of shell commands like `sed -i`, so you see the changes as diffs.
