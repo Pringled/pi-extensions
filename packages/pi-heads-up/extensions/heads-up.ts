@@ -10,7 +10,8 @@ const MIN_TOOL_CALLS = 3;
 export default function (pi: ExtensionAPI) {
 	let pending: AbortController | undefined;
 
-	// The label in the warning color, and the note in a softer color than pi's reply, wrapped to line up after the label
+	// The label in the warning color, and the note in a softer color than pi's reply, wrapped to line up after the label.
+	// A blank line above keeps it apart from other widgets, such as pi-polish's turn summary
 	const show = (ctx: ExtensionContext, note: string | undefined) =>
 		ctx.ui.setWidget(
 			"heads-up",
@@ -20,9 +21,12 @@ export default function (pi: ExtensionAPI) {
 						render(width: number) {
 							const label = "✦ heads-up: ";
 							const indent = 1 + visibleWidth(label);
-							return wrapTextWithAnsi(note, Math.max(10, width - indent - 1)).map(
-								(line, i) => (i === 0 ? ` ${theme.fg("warning", label)}` : " ".repeat(indent)) + theme.fg("muted", line),
-							);
+							return [
+								"",
+								...wrapTextWithAnsi(note, Math.max(10, width - indent - 1)).map(
+									(line, i) => (i === 0 ? ` ${theme.fg("warning", label)}` : " ".repeat(indent)) + theme.fg("muted", line),
+								),
+							];
 						},
 					})
 				: undefined,
@@ -44,29 +48,33 @@ export default function (pi: ExtensionAPI) {
 		const controller = new AbortController();
 		pending = controller;
 		const level = pi.getThinkingLevel();
+		const model = ctx.model;
 		const ask: AgentMessage = { role: "user", content: [{ type: "text", text: PROMPT }], timestamp: Date.now() };
-		try {
-			// The conversation exactly as pi sends it, at the same thinking level, so the request reuses pi's prompt cache
-			const answer = await ctx.modelRegistry
-				.streamSimple(ctx.model, normalizeContext({ messages: convertToLlm([...ctx.sessionManager.buildSessionProjection().messages, ask]) }), {
-					reasoning: ctx.model.reasoning && level !== "off" ? level : undefined,
-					maxTokens: 2000,
-					sessionId: ctx.sessionManager.getSessionId(),
-					signal: controller.signal,
-				})
-				.result();
-			if (controller.signal.aborted || answer.stopReason !== "stop") return;
-			const note = answer.content
-				.map((part) => (part.type === "text" ? part.text : ""))
-				.join("")
-				.replace(/`/g, "")
-				.replace(/\s+/g, " ")
-				.trim();
-			if (note && !/^none\.?$/i.test(note)) show(ctx, note);
-		} catch {
-			// The note is optional, so failures stay quiet
-		} finally {
-			if (pending === controller) pending = undefined;
-		}
+		// Not awaited: pi keeps its working line up until every agent_end handler returns
+		void (async () => {
+			try {
+				// The conversation exactly as pi sends it, at the same thinking level, so the request reuses pi's prompt cache
+				const answer = await ctx.modelRegistry
+					.streamSimple(model, normalizeContext({ messages: convertToLlm([...ctx.sessionManager.buildSessionProjection().messages, ask]) }), {
+						reasoning: model.reasoning && level !== "off" ? level : undefined,
+						maxTokens: 2000,
+						sessionId: ctx.sessionManager.getSessionId(),
+						signal: controller.signal,
+					})
+					.result();
+				if (controller.signal.aborted || answer.stopReason !== "stop") return;
+				const note = answer.content
+					.map((part) => (part.type === "text" ? part.text : ""))
+					.join("")
+					.replace(/`/g, "")
+					.replace(/\s+/g, " ")
+					.trim();
+				if (note && !/^none\.?$/i.test(note)) show(ctx, note);
+			} catch {
+				// The note is optional, so failures stay quiet
+			} finally {
+				if (pending === controller) pending = undefined;
+			}
+		})();
 	});
 }
