@@ -1,8 +1,8 @@
 import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLocalBashOperations, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey, stripTerminalSequences, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const TAIL_LINES = 20;
@@ -46,17 +46,27 @@ function elapsed(job: Job): string {
 	return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${s % 60}s`;
 }
 
-function summary(job: Job): string {
-	const state = job.status === "exited" ? `exit ${job.exitCode}` : job.status;
-	return `${job.id} [${state}, ${elapsed(job)}] ${job.command}\n  log: ${job.log}`;
+function state(job: Job): string {
+	return job.status === "exited" ? `exit ${job.exitCode}` : job.status;
 }
 
-/** The part of a command worth showing: its first line, without a leading cd and with a script path shortened to its name. */
+function summary(job: Job): string {
+	return `${job.id} [${state(job)}, ${elapsed(job)}] ${job.command}\n  log: ${job.log}`;
+}
+
+/** An output line as a terminal would last have shown it: without escape codes or control characters, and a progress bar redrawn with \r in its latest state only. */
+function cleanLine(line: string): string {
+	const shown = stripTerminalSequences(line).split("\r").filter((part) => part.trim()).at(-1) ?? "";
+	return shown.replace(/\t/g, "  ").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "").trimEnd();
+}
+
+/** The part of a command worth showing: its first line, without a leading cd, with a script path shortened to its name and at most 50 characters. */
 function shownCommand(command: string): string {
-	return command
+	const shown = command
 		.split("\n")[0]
 		.replace(/^\s*(cd\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*)+/, "")
 		.replace(/^\S*\/(?=[^\s/]+(\s|$))/, "");
+	return shown.length > 50 ? `${shown.slice(0, 49)}…` : shown;
 }
 
 /** True when a command starts a job with a bare & (not &&, 2>&1, &> or |&). */
@@ -153,6 +163,8 @@ export default function (pi: ExtensionAPI) {
 	// One line per running job above the input, with its elapsed time and latest output
 	let ui: ExtensionContext["ui"] | undefined;
 	const running = () => [...jobs.values()].filter((job) => job.status === "running");
+	// The job open in /bg, left out of the jobs line meanwhile so it isn't shown twice
+	let viewing: Job | undefined;
 	// "full" (the default), "compact" without the output, or "off", set with "background": { "jobs": ... } in pi's settings.json
 	const jobsLine = () => (pi.getSettings() as { background?: { jobs?: string } }).background?.jobs ?? "full";
 	const showJobs = () => {
@@ -164,12 +176,11 @@ export default function (pi: ExtensionAPI) {
 				dispose: () => clearInterval(timer),
 				invalidate() {},
 				render(width: number) {
-					const live = running();
+					const live = running().filter((job) => job !== viewing);
 					const lines = live.slice(0, MAX_SHOWN_JOBS).map((job) => {
-						const command = shownCommand(job.command);
 						const text =
 							theme.fg("accent", " ⏵ ") +
-							theme.fg("toolTitle", `${job.id} ${command.length > 50 ? `${command.slice(0, 49)}…` : command}`) +
+							theme.fg("toolTitle", `${job.id} ${shownCommand(job.command)}`) +
 							theme.fg("dim", ` · ${elapsed(job)}${jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : ""}`);
 						return truncateToWidth(text, width);
 					});
@@ -254,8 +265,7 @@ export default function (pi: ExtensionAPI) {
 			const onData = (d: Buffer) => {
 				out.write(d);
 				watch?.(d);
-				// Progress bars redraw with \r, so the last segment of either kind of line break is the current state
-				const last = d.toString("utf8").replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").split(/\r\n|\r|\n/).map((line) => line.trim()).filter(Boolean).at(-1);
+				const last = d.toString("utf8").split("\n").map(cleanLine).filter((line) => line.trim()).at(-1)?.trim();
 				if (last) job.lastLine = last;
 			};
 
@@ -324,6 +334,72 @@ export default function (pi: ExtensionAPI) {
 			job.controller.abort();
 			return { content: [{ type: "text", text: `Stopping ${job.id}` }], details: {} };
 		},
+	});
+
+	// Shows a job's latest output in place of the input until esc, refreshed every second while it runs
+	pi.registerCommand("bg", {
+		description: "Show a background job's latest output",
+		getArgumentCompletions: (prefix) => {
+			const matching = [...jobs.values()].filter((job) => job.id.startsWith(prefix.trim().toLowerCase()));
+			return matching.length ? matching.map((job) => ({ value: job.id, label: job.id, description: `${shownCommand(job.command)} · ${state(job)}` })) : null;
+		},
+		handler: async (args, ctx) => {
+			if (!ctx.hasUI) return;
+			const all = [...jobs.values()].reverse();
+			if (all.length === 0) return ctx.ui.notify("No background jobs yet", "info");
+			// "/bg 2" works as well as "/bg bg2"
+			const wanted = args.trim().toLowerCase().replace(/^(\d+)$/, "bg$1");
+			let job = wanted ? jobs.get(wanted) : all.length === 1 ? all[0] : undefined;
+			if (wanted && !job) return ctx.ui.notify(`No background job ${args.trim()}; there's ${[...jobs.keys()].join(", ")}`, "warning");
+			if (!job) {
+				// Matched by position, since the elapsed time in a label changes while the list is open
+				const options = all.map((other) => `${other.id} ${shownCommand(other.command)} · ${state(other)} · ${elapsed(other)}`);
+				job = all[options.indexOf((await ctx.ui.select("Background jobs", options)) ?? "")];
+				if (!job) return;
+			}
+			const shown = job;
+			viewing = shown;
+			const log = shown.log.replace(homedir(), "~");
+			try {
+				await ctx.ui.custom<void>((tui, theme, _kb, done) => {
+					const timer = setInterval(() => tui.requestRender(), 1000);
+					return {
+						dispose: () => clearInterval(timer),
+						invalidate() {},
+						handleInput: (data: string) => {
+							if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || data === "q") done();
+						},
+						render(width: number) {
+							const color = shown.status === "running" ? "accent" : shown.status === "exited" && shown.exitCode === 0 ? "success" : "error";
+							const title = theme.fg(color, " ● ") + theme.fg("toolTitle", `${shown.id} ${shownCommand(shown.command)}`);
+							const status = theme.fg("muted", `${state(shown)} · ${elapsed(shown)} `);
+							const gap = Math.max(1, width - visibleWidth(title) - visibleWidth(status));
+							// At most half the terminal, so the conversation above stays in view
+							const text = tail(shown.log, Math.max(3, Math.min(TAIL_LINES, Math.floor(tui.terminal.rows / 2))));
+							const output = text === "(no output)" ? [theme.fg("dim", theme.italic("   no output yet"))] : text.split("\n").map((line) => `   ${cleanLine(line)}`);
+							return [
+								theme.fg("borderMuted", "─".repeat(width)),
+								title + " ".repeat(gap) + status,
+								...output,
+								theme.fg("dim", ` esc to close · ${log}`),
+								theme.fg("borderMuted", "─".repeat(width)),
+							].map((line) => truncateToWidth(line, width));
+						},
+					};
+				});
+			} finally {
+				viewing = undefined;
+			}
+		},
+	});
+
+	// After /reload or a resume, carry on after the ids already in the conversation so "bg3" keeps meaning one job
+	pi.on("session_start", async (_event, ctx) => {
+		for (const entry of ctx.sessionManager.getBranch()) {
+			const msg = entry.type === "message" ? (entry.message as any) : undefined;
+			const n = Number(/^bg(\d+)$/.exec(msg?.role === "toolResult" && msg.toolName === "bg_run" ? String(msg.details?.id) : "")?.[1]);
+			if (n >= next) next = n + 1;
+		}
 	});
 
 	pi.on("session_shutdown", async () => {
