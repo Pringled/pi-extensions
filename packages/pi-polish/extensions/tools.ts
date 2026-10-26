@@ -448,7 +448,7 @@ export default function (pi: ExtensionAPI) {
 
 	const tick = (group: Group) => {
 		const running = group.members.some((m) => !m.done);
-		if (running && !group.timer) group.timer = setInterval(() => rowInvalidate.get(group.members[0].id)?.(), 1000);
+		if (running && !group.timer) group.timer = setInterval(() => rowInvalidate.get(group.members[0].id)?.(), 500);
 		if (!running && group.timer) {
 			clearInterval(group.timer);
 			group.timer = undefined;
@@ -547,7 +547,9 @@ export default function (pi: ExtensionAPI) {
 		if (running) {
 			const secs = Math.round((Date.now() - group.started) / 1000);
 			const active = [...group.members].reverse().find((m) => !m.done) ?? group.members[group.members.length - 1];
-			const head = theme.fg("accent", `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
+			// The dot pulses every half second while the group runs, like a cursor blink
+			const pulse = Math.floor(Date.now() / 500) % 2 ? "dim" : "accent";
+			const head = theme.fg(pulse, `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
 			return oneLine([head, theme.fg("dim", `  └ ${active.label}`)]);
 		}
 		// Finished rows go quiet, like Claude Code's: dim text, with a red ● only when something failed
