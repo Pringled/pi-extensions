@@ -119,6 +119,7 @@ export default function (pi: ExtensionAPI) {
 	});
 	pi.on("agent_start", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
+		ctx.ui.setWidget("pi-polish-turn", undefined);
 		started = Date.now();
 		tokens = 0;
 		streamed = 0;
@@ -150,7 +151,13 @@ export default function (pi: ExtensionAPI) {
 	pi.on("agent_end", async (_event, ctx) => {
 		clearInterval(timer);
 		timer = undefined;
-		if (ctx.hasUI) ctx.ui.setWorkingMessage();
+		if (!ctx.hasUI) return;
+		ctx.ui.setWorkingMessage();
+		// How long the turn took and when it ended, until the next one starts
+		const secs = Math.round((Date.now() - started) / 1000);
+		const took = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+		const done = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+		ctx.ui.setWidget("pi-polish-turn", (_tui, theme) => new Text(theme.fg("dim", `✻ Worked for ${took} · done ${done}`), 0, 0));
 	});
 	pi.on("session_shutdown", async () => clearInterval(timer));
 
