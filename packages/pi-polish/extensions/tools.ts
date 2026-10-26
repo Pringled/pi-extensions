@@ -611,7 +611,19 @@ export default function (pi: ExtensionAPI) {
 		}),
 	};
 	// Only the drawing changes: pi's own tools keep running, with their own schema and on/off state
-	pi.registerToolRenderer((toolName, next) => renderers[toolName] ?? (kindOf(toolName) ? groupedTool(toolName) : next()));
+	pi.registerToolRenderer((toolName, next) => {
+		if (renderers[toolName] || !kindOf(toolName)) return renderers[toolName] ?? next();
+		const own = groupedTool(toolName);
+		if (kindOf(toolName) !== "mcp") return own;
+		// Expanded MCP results keep pi's own view, which shows images and limits long one-line JSON. It gets
+		// no lastComponent, since that may be the empty component drawn while the row was collapsed.
+		const pis = next()?.renderResult;
+		return {
+			...own,
+			renderResult: (result, options, theme, context) =>
+				options.expanded && pis ? pis(result, options, theme, { ...context, lastComponent: undefined }) : own.renderResult!(result, options, theme, context),
+		};
+	});
 
 	// pi only lists a tool's guidelines while the tool is on
 	pi.on("before_agent_start", async (event) => {
