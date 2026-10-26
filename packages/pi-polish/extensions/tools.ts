@@ -7,7 +7,8 @@ import {
 	type ExtensionAPI,
 	type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
-import { type Component, Container, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { type Component, Container, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { shortCommand } from "./command.ts";
 import bash from "@shikijs/langs/shellscript";
 import css from "@shikijs/langs/css";
 import c from "@shikijs/langs/c";
@@ -56,13 +57,17 @@ const DIFF_PREVIEW_LINES = 16;
 const BG_RESET = "\x1b[49m";
 const FG_RESET = "\x1b[39m";
 
-type Kind = "bash" | "read" | "search" | "list";
-const KIND_OF: Record<string, Kind> = { bash: "bash", read: "read", grep: "search", find: "search", ls: "list" };
+type Kind = "bash" | "read" | "search" | "list" | "tools" | "mcp";
+const KIND_OF: Record<string, Kind> = { bash: "bash", read: "read", grep: "search", find: "search", ls: "list", tool_search: "tools" };
+// Pi names MCP tools mcp__<server>__<tool>
+const kindOf = (toolName: string): Kind | undefined => KIND_OF[toolName] ?? (toolName.startsWith("mcp__") ? "mcp" : undefined);
 const VERBS: Record<Kind, [done: string, running: string, one: string, many: string]> = {
 	bash: ["Ran", "Running", "shell command", "shell commands"],
 	read: ["Read", "Reading", "file", "files"],
 	search: ["Searched", "Searching", "pattern", "patterns"],
 	list: ["Listed", "Listing", "directory", "directories"],
+	tools: ["Ran", "Running", "tool search", "tool searches"],
+	mcp: ["Called", "Calling", "MCP tool", "MCP tools"],
 };
 
 interface Member {
@@ -98,15 +103,23 @@ function shortPath(path: unknown, cwd: string): string {
 function label(toolName: string, args: any, cwd: string): string {
 	switch (toolName) {
 		case "bash":
-			return `$ ${String(args?.command ?? "").split("\n")[0]}`;
+			return `$ ${shortCommand(String(args?.command ?? ""), cwd)}`;
 		case "read":
 			return `Read ${shortPath(args?.path, cwd)}`;
 		case "grep":
 			return `Search "${args?.pattern ?? ""}"${args?.path ? ` in ${shortPath(args.path, cwd)}` : ""}`;
 		case "find":
 			return `Find "${args?.pattern ?? ""}"${args?.path ? ` in ${shortPath(args.path, cwd)}` : ""}`;
-		default:
+		case "tool_search":
+			return `Search tools "${args?.query ?? ""}"`;
+		case "ls":
 			return `List ${args?.path ? shortPath(args.path, cwd) : "."}`;
+		default: {
+			// server/tool like pi's own MCP rows, with the first text argument, which is usually the query
+			const [, server, ...tool] = toolName.split("__");
+			const first = Object.values(args ?? {}).find((v) => typeof v === "string") as string | undefined;
+			return `${server}/${tool.join("__")}${first ? ` "${first.split("\n")[0]}"` : ""}`;
+		}
 	}
 }
 
@@ -412,6 +425,14 @@ function empty() {
 	return new Container();
 }
 
+/** Lines cut to the screen width instead of wrapping; the first line keeps its suffix (failures and the expand hint) in view. */
+function oneLine(lines: string[], suffix = ""): Component {
+	return {
+		invalidate() {},
+		render: (width: number) => lines.map((line, i) => (i === 0 ? truncateToWidth(line, Math.max(10, width - visibleWidth(suffix))) + suffix : truncateToWidth(line, width))),
+	};
+}
+
 export default function (pi: ExtensionAPI) {
 	const cwd = process.cwd();
 	const groupOf = new Map<string, Group>();
@@ -437,7 +458,7 @@ export default function (pi: ExtensionAPI) {
 
 	const assign = (id: string, toolName: string, args: unknown, done = false, error = false): Group => {
 		current ??= { members: [], started: Date.now() };
-		current.members.push({ id, kind: KIND_OF[toolName], label: label(toolName, args, cwd), done, error });
+		current.members.push({ id, kind: kindOf(toolName)!, label: label(toolName, args, cwd), done, error });
 		groupOf.set(id, current);
 		return current;
 	};
@@ -460,7 +481,7 @@ export default function (pi: ExtensionAPI) {
 			for (const part of msg.content ?? []) {
 				if (part.type === "text" && part.text.trim()) current = undefined;
 				if (part.type !== "toolCall") continue;
-				if (KIND_OF[part.name]) assign(part.id, part.name, part.arguments, true);
+				if (kindOf(part.name)) assign(part.id, part.name, part.arguments, true);
 				else current = undefined;
 			}
 		}
@@ -492,7 +513,7 @@ export default function (pi: ExtensionAPI) {
 		if (msg.role === "assistant" && (msg.content ?? []).some((c: any) => c.type === "text" && c.text.trim())) current = undefined;
 	});
 	pi.on("tool_execution_start", async (event) => {
-		if (!KIND_OF[event.toolName]) {
+		if (!kindOf(event.toolName)) {
 			current = undefined;
 			return;
 		}
@@ -527,12 +548,12 @@ export default function (pi: ExtensionAPI) {
 			const secs = Math.round((Date.now() - group.started) / 1000);
 			const active = [...group.members].reverse().find((m) => !m.done) ?? group.members[group.members.length - 1];
 			const head = theme.fg("accent", `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
-			return new Text(`${head}\n${theme.fg("dim", `  └ ${active.label}`)}`, 0, 0);
+			return oneLine([head, theme.fg("dim", `  └ ${active.label}`)]);
 		}
 		const hint = theme.fg("dim", `  (${keyHint("app.tools.expand", "expand")})`);
 		const mark = theme.fg(failed ? "error" : "success", `${MARK} `);
 		const text = group.members.length === 1 ? group.members[0].label : summary(group, false);
-		return new Text(mark + theme.fg("toolTitle", text) + failNote + hint, 0, 0);
+		return oneLine([mark + theme.fg("toolTitle", text)], failNote + hint);
 	};
 
 	// The ● carries the status, like Claude Code: dim while arguments stream, accent while running, green or red when done.
@@ -549,8 +570,16 @@ export default function (pi: ExtensionAPI) {
 		renderCall(args: any, theme, context) {
 			const grouped = renderGrouped(context.toolCallId, theme, context);
 			if (grouped) return grouped;
-			const text = truncateToWidth(label(toolName, args, cwd), 400);
-			return new Text(dot(theme, context) + theme.fg("toolTitle", text), 0, 0);
+			// Expanded, a shell command shows in full, with its cd and every line; collapsed rows keep the short label
+			const command = context.expanded && toolName === "bash" ? String(args?.command ?? "").trim().split("\n") : undefined;
+			const text = command ? `$ ${command.slice(0, 60).join("\n")}${command.length > 60 ? `\n... ${command.length - 60} more lines` : ""}` : truncateToWidth(label(toolName, args, cwd), 400);
+			const mark = dot(theme, context);
+			// Wrapped lines continue under the text, past the dot, instead of at the left edge
+			return {
+				invalidate() {},
+				render: (width: number) =>
+					wrapTextWithAnsi(text, Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + theme.fg("toolTitle", line)),
+			};
 		},
 		renderResult(result, { expanded }, theme) {
 			if (!expanded) return empty();
@@ -599,7 +628,19 @@ export default function (pi: ExtensionAPI) {
 		}),
 	};
 	// Only the drawing changes: pi's own tools keep running, with their own schema and on/off state
-	pi.registerToolRenderer((toolName, next) => renderers[toolName] ?? next());
+	pi.registerToolRenderer((toolName, next) => {
+		if (renderers[toolName] || !kindOf(toolName)) return renderers[toolName] ?? next();
+		const own = groupedTool(toolName);
+		if (kindOf(toolName) !== "mcp") return own;
+		// Expanded MCP results keep pi's own view, which shows images and limits long one-line JSON. It gets
+		// no lastComponent, since that may be the empty component drawn while the row was collapsed.
+		const pis = next()?.renderResult;
+		return {
+			...own,
+			renderResult: (result, options, theme, context) =>
+				options.expanded && pis ? pis(result, options, theme, { ...context, lastComponent: undefined }) : own.renderResult!(result, options, theme, context),
+		};
+	});
 
 	// pi only lists a tool's guidelines while the tool is on
 	pi.on("before_agent_start", async (event) => {

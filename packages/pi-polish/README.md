@@ -13,7 +13,7 @@ pi install npm:pi-polish
 
 ## Features
 
-- Shell commands, file reads and searches in a row fold into one line that updates while they run (`Running 2 shell commands… · 5s`) and then sums them up (`Ran 3 shell commands, read 2 files`). `ctrl+o` shows the full output.
+- Shell commands, file reads, searches and MCP tool calls in a row fold into one line that updates while they run (`Running 2 shell commands… · 5s`) and then sums them up (`Ran 3 shell commands, read 2 files` or `Called 2 MCP tools`). `ctrl+o` shows the full output.
 - Edits and new files show as diffs with syntax highlighting and the changed words marked, in colors that follow your Pi theme, dark or light.
 - A dot on each tool row shows its status: orange while running, green when done, red if it failed.
 - An orange status line shows what Pi is doing, how long it has been at it and how many tokens it has written.
@@ -22,7 +22,7 @@ pi install npm:pi-polish
 
 ## Compatibility
 
-pi-polish only changes how Pi's built-in tools are drawn; the tools themselves run exactly as before. The chat styling (the markers and the status line) reaches into Pi's internal UI, so a new Pi release can break that part of the look until pi-polish is updated. Your sessions are never affected. Tested with Pi 1.3.
+pi-polish only changes how Pi's built-in tools and MCP tools are drawn; the tools themselves run exactly as before. The chat styling (the markers and the status line) reaches into Pi's internal UI, so a new Pi release can break that part of the look until pi-polish is updated. Your sessions are never affected. Tested with Pi 1.4.
 
 ## License
 
