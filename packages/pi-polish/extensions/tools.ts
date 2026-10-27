@@ -557,7 +557,8 @@ export default function (pi: ExtensionAPI) {
 		}
 		// Finished rows go quiet, like Claude Code's: dim text, with a red ● only when something failed
 		const mark = failed ? theme.fg("error", `${MARK} `) : "  ";
-		const text = group.members.length === 1 ? group.members[0].label : summary(group, false);
+		// Always the summary, even for one call ("Ran 1 shell command"), like Claude Code; ctrl+o shows each one
+		const text = summary(group, false);
 		return oneLine([mark + theme.fg("dim", text)], failNote);
 	};
 

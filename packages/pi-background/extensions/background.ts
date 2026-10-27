@@ -266,7 +266,9 @@ export default function (pi: ExtensionAPI) {
 		renderShell: "self",
 		renderCall: (args: any, theme, context) => {
 			const command = String(args?.command ?? "");
-			return row(theme, `Background $ ${shortCommand(command, args?.cwd ?? process.cwd())}`, context, `Background $ ${command.trim()}`);
+			// Collapsed, without leading settings such as PYTHONPATH=/some/src, like the jobs line; ctrl+o shows them
+			const short = shortCommand(command, args?.cwd ?? process.cwd()).replace(/^(\w+=("[^"]*"|'[^']*'|\S*)\s+)+/, "");
+			return row(theme, `Background $ ${short}`, context, `Background $ ${command.trim()}`);
 		},
 		renderResult: (result, { expanded }, theme) => note(theme, result, expanded),
 		parameters: Type.Object({
