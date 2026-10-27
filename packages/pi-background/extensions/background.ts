@@ -236,13 +236,13 @@ export default function (pi: ExtensionAPI) {
 			"When unsure whether a command is quick, prefer bg_run: a quick job just reports back sooner, while a long bash command blocks the user until it finishes.",
 			"After bg_run, continue with independent work or end your turn; a message with the exit code and log tail arrives automatically when the job exits, so never sleep, poll or tail the log to wait for it.",
 			"Keep using bash for quick commands whose output you need right away, such as git, ls, cat, grep, find, file inspection and short checks.",
-			"To react when a bg_run job prints something specific while it keeps running (a server is ready, an epoch finished, an error appeared), pass wake_on with a regex instead of polling.",
+			"Pass wake_on only when you must act before a bg_run job ends, such as a server becoming ready to test against, or when the user asked to follow its progress. To report a job's result, leave wake_on out: the exit message already brings the exit code and last lines, so waking on every epoch or step only adds turns.",
 			"Don't redirect a bg_run command's output to a file (> file, 2>&1, nohup): bg_run already saves all of it to the job's log, and redirecting hides the job's progress from the user and from wake_on. If the output should be kept, tell the user where the job's log is.",
 			"bg_run starts only after the other tool calls in the same reply have finished, so editing a file and starting a job that uses it in one reply is safe.",
 			"Use bg_status to check progress of a bg_run job and bg_kill to stop one.",
 			`bash commands time out after ${BASH_DEFAULT_TIMEOUT / 60} minutes unless you pass timeout (at most ${BASH_MAX_TIMEOUT / 60} minutes); run anything that may take longer with bg_run instead.`,
 			"Unless the user explicitly asks for that bash command, never wait, poll or sleep in bash (while/until loops with sleep, watch, repeated status checks), not even as part of a larger command; start the wait with bg_run and pass wake_on to be woken when the awaited output appears.",
-			"Unless the user explicitly asks otherwise, start long-running processes (training or evaluation runs, servers, watchers) with bg_run, not with & or nohup in bash followed by sleep; pass wake_on matching the lines you want to see, such as results or Traceback.",
+			"Unless the user explicitly asks otherwise, start long-running processes (training or evaluation runs, servers, watchers) with bg_run, not with & or nohup in bash followed by sleep.",
 		],
 		// Runs after the edits in the same reply, so the job starts from the code pi just wrote
 		executionMode: "sequential",
@@ -254,7 +254,7 @@ export default function (pi: ExtensionAPI) {
 			cwd: Type.Optional(Type.String({ description: "Working directory (defaults to the session cwd)" })),
 			wake_on: Type.Optional(
 				Type.String({
-					description: "Regex; also wake you while the job runs whenever an output line matches, e.g. 'listening on|ready' or 'epoch \\d+'. Matches within a second are batched; at most 10 wake-ups per job.",
+					description: "Regex; also wake you while the job runs whenever an output line matches, e.g. 'listening on|ready'. Matches within a second are batched; at most 10 wake-ups per job.",
 				}),
 			),
 		}),
