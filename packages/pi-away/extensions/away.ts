@@ -21,11 +21,11 @@ export default function (pi: ExtensionAPI) {
 						invalidate() {},
 						render(width: number) {
 							const label = "※ recap: ";
-							const indent = 1 + visibleWidth(label);
+							const indent = visibleWidth(label);
 							return [
 								"",
 								...wrapTextWithAnsi(recap, Math.max(10, width - indent - 1)).map((line, i) =>
-									theme.fg("dim", (i === 0 ? ` ${label}` : " ".repeat(indent)) + line),
+									theme.fg("dim", (i === 0 ? label : " ".repeat(indent)) + line),
 								),
 							];
 						},

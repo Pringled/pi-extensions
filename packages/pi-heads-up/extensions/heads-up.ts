@@ -20,11 +20,11 @@ export default function (pi: ExtensionAPI) {
 						invalidate() {},
 						render(width: number) {
 							const label = "✦ heads-up: ";
-							const indent = 1 + visibleWidth(label);
+							const indent = visibleWidth(label);
 							return [
 								"",
 								...wrapTextWithAnsi(note, Math.max(10, width - indent - 1)).map(
-									(line, i) => (i === 0 ? ` ${theme.fg("warning", label)}` : " ".repeat(indent)) + theme.fg("muted", line),
+									(line, i) => (i === 0 ? theme.fg("warning", label) : " ".repeat(indent)) + theme.fg("muted", line),
 								),
 							];
 						},
