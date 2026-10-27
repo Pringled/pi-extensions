@@ -2,8 +2,9 @@ import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLocalBashOperations, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey, stripTerminalSequences, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { shortCommand } from "./command.ts";
 
 const TAIL_LINES = 20;
 const TAIL_BYTES = 64 * 1024;
@@ -65,6 +66,8 @@ function shownCommand(command: string): string {
 	const shown = command
 		.split("\n")[0]
 		.replace(/^\s*(cd\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*)+/, "")
+		// Leading settings such as PYTHONPATH=/some/src, which the path shortening below would cut at their last /
+		.replace(/^(\w+=("[^"]*"|'[^']*'|\S*)\s+)+/, "")
 		.replace(/^\S*\/(?=[^\s/]+(\s|$))/, "");
 	return shown.length > 50 ? `${shown.slice(0, 49)}…` : shown;
 }
@@ -204,22 +207,36 @@ export default function (pi: ExtensionAPI) {
 
 	// Compact, Claude-Code-style rows instead of pi's default boxed tool and message rendering: quiet grey once done,
 	// with a dot only while running or when something failed
+	// "  └ text" in dim, with long and extra lines wrapped under the text instead of at the left edge
+	const branch = (theme: any, text: string, head?: string) => ({
+		invalidate() {},
+		render: (width: number) => [
+			...(head ? [truncateToWidth(head, width)] : []),
+			...wrapTextWithAnsi(text, Math.max(10, width - 4)).map((line, i) => theme.fg("dim", `${i === 0 ? "  └ " : "    "}${line}`)),
+		],
+	});
 	pi.registerMessageRenderer("background-job", (message, { expanded }, theme) => {
 		const d = (message.details ?? {}) as { headline?: string; last?: string; error?: boolean };
 		const title = `Background ${d.headline ?? ""}`;
 		const head = d.error ? theme.fg("error", "● ") + theme.fg("toolTitle", title) : `  ${theme.fg("dim", title)}`;
-		const body = expanded ? String(message.content) : (d.last ?? "");
-		return new Text(`${head}\n${theme.fg("dim", `  └ ${body.replace(/\n/g, "\n    ")}`)}`, 0, 0);
+		return branch(theme, expanded ? String(message.content) : (d.last ?? ""), head);
 	});
-	const row = (theme: any, text: string, context: any) => {
-		const color = context.isError ? "error" : context.executionStarted && context.isPartial ? "accent" : undefined;
-		return new Text(color ? theme.fg(color, "● ") + theme.fg("toolTitle", text) : `  ${theme.fg("dim", text)}`, 0, 0);
-	};
+	// One line, like pi-polish's shell rows; expanded (ctrl+o) shows the whole text, wrapped under the row
+	const row = (theme: any, text: string, context: any, full = text) => ({
+		invalidate() {},
+		render(width: number) {
+			const color = context.isError ? "error" : context.executionStarted && context.isPartial ? "accent" : undefined;
+			const mark = color ? theme.fg(color, "● ") : "  ";
+			const paint = (line: string) => theme.fg(color ? "toolTitle" : "dim", line);
+			if (!context.expanded) return [mark + paint(truncateToWidth(text, Math.max(10, width - 2)))];
+			return wrapTextWithAnsi(full, Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + paint(line));
+		},
+	});
 	const note = (theme: any, result: any, expanded: boolean) => {
 		const text = result.content?.map((c: any) => c.text ?? "").join("\n") ?? "";
 		// Collapsed: first sentence only ("Started bg1"), without the log path
 		const short = text.split("\n")[0].split(";")[0];
-		return new Text(theme.fg("dim", `  └ ${(expanded ? text : short).replace(/\n/g, "\n    ")}`), 0, 0);
+		return branch(theme, expanded ? text : short);
 	};
 
 	pi.registerTool({
@@ -247,7 +264,12 @@ export default function (pi: ExtensionAPI) {
 		// Runs after the edits in the same reply, so the job starts from the code pi just wrote
 		executionMode: "sequential",
 		renderShell: "self",
-		renderCall: (args: any, theme, context) => row(theme, `Background $ ${String(args?.command ?? "").split("\n")[0]}`, context),
+		renderCall: (args: any, theme, context) => {
+			const command = String(args?.command ?? "");
+			// Collapsed, without leading settings such as PYTHONPATH=/some/src, like the jobs line; ctrl+o shows them
+			const short = shortCommand(command, args?.cwd ?? process.cwd()).replace(/^(\w+=("[^"]*"|'[^']*'|\S*)\s+)+/, "");
+			return row(theme, `Background $ ${short}`, context, `Background $ ${command.trim()}`);
+		},
 		renderResult: (result, { expanded }, theme) => note(theme, result, expanded),
 		parameters: Type.Object({
 			command: Type.String({ description: "Shell command to run" }),
