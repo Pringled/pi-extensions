@@ -473,7 +473,10 @@ export default function (pi: ExtensionAPI) {
 	// Rebuild groups for history so resumed sessions collapse the same way
 	pi.on("session_start", async (_event, ctx) => {
 		reset();
-		for (const entry of ctx.sessionManager.getBranch()) {
+		const branch = ctx.sessionManager.getBranch();
+		// Tool results come after their calls, so collect the failures first
+		const failed = new Set(branch.flatMap((e: any) => (e.type === "message" && e.message.role === "toolResult" && e.message.isError ? [e.message.toolCallId] : [])));
+		for (const entry of branch) {
 			if (entry.type !== "message") continue;
 			const msg = entry.message as any;
 			if (msg.role === "user") current = undefined;
@@ -481,7 +484,7 @@ export default function (pi: ExtensionAPI) {
 			for (const part of msg.content ?? []) {
 				if (part.type === "text" && part.text.trim()) current = undefined;
 				if (part.type !== "toolCall") continue;
-				if (kindOf(part.name)) assign(part.id, part.name, part.arguments, true);
+				if (kindOf(part.name)) assign(part.id, part.name, part.arguments, true, failed.has(part.id));
 				else current = undefined;
 			}
 		}

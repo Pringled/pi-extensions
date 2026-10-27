@@ -1,7 +1,7 @@
 import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { createLocalBashOperations, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createLocalBashOperations, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Key, matchesKey, stripTerminalSequences, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
@@ -161,35 +161,40 @@ export default function (pi: ExtensionAPI) {
 	};
 
 	// One line per running job above the input, with its elapsed time and latest output
-	let ui: ExtensionContext["ui"] | undefined;
 	const running = () => [...jobs.values()].filter((job) => job.status === "running");
 	// The job open in /bg, left out of the jobs line meanwhile so it isn't shown twice
 	let viewing: Job | undefined;
 	// "full" (the default), "compact" without the output, or "off", set with "background": { "jobs": ... } in pi's settings.json
 	const jobsLine = () => (pi.getSettings() as { background?: { jobs?: string } }).background?.jobs ?? "full";
+	// The widget is set once per session and redrawn in place: setting it again would move it below the widgets other
+	// extensions added since, while running jobs belong at the top, next to what Pi is doing now
+	let redrawJobs = () => {};
+	let ticker: NodeJS.Timeout | undefined;
 	const showJobs = () => {
-		if (!ui) return;
-		if (jobsLine() === "off" || running().length === 0) return ui.setWidget("background-jobs", undefined);
-		ui.setWidget("background-jobs", (tui, theme) => {
-			const timer = setInterval(() => tui.requestRender(), 1000);
-			return {
-				dispose: () => clearInterval(timer),
-				invalidate() {},
-				render(width: number) {
-					const live = running().filter((job) => job !== viewing);
-					const lines = live.slice(0, MAX_SHOWN_JOBS).map((job) => {
-						const text =
-							theme.fg("accent", " ⏵ ") +
-							theme.fg("toolTitle", `${job.id} ${shownCommand(job.command)}`) +
-							theme.fg("dim", ` · ${elapsed(job)}${jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : ""}`);
-						return truncateToWidth(text, width);
-					});
-					if (live.length > MAX_SHOWN_JOBS) lines.push(theme.fg("dim", `   and ${live.length - MAX_SHOWN_JOBS} more`));
-					return lines;
-				},
-			};
-		});
+		// A running job's elapsed time and latest output change every second
+		if (running().length > 0) ticker ??= setInterval(() => redrawJobs(), 1000);
+		else {
+			clearInterval(ticker);
+			ticker = undefined;
+		}
+		redrawJobs();
 	};
+	const jobsWidget = (theme: any) => ({
+		invalidate() {},
+		render(width: number) {
+			if (jobsLine() === "off") return [];
+			const live = running().filter((job) => job !== viewing);
+			const lines = live.slice(0, MAX_SHOWN_JOBS).map((job) => {
+				const text =
+					theme.fg("accent", "⏵ ") +
+					theme.fg("toolTitle", `${job.id} ${shownCommand(job.command)}`) +
+					theme.fg("dim", ` · ${elapsed(job)}${jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : ""}`);
+				return truncateToWidth(text, width);
+			});
+			if (live.length > MAX_SHOWN_JOBS) lines.push(theme.fg("dim", `  and ${live.length - MAX_SHOWN_JOBS} more`));
+			return lines;
+		},
+	});
 
 	const find = (id: string): Job => {
 		const job = jobs.get(id);
@@ -197,16 +202,18 @@ export default function (pi: ExtensionAPI) {
 		return job;
 	};
 
-	// Compact, Claude-Code-style rows instead of pi's default boxed tool and message rendering
+	// Compact, Claude-Code-style rows instead of pi's default boxed tool and message rendering: quiet grey once done,
+	// with a dot only while running or when something failed
 	pi.registerMessageRenderer("background-job", (message, { expanded }, theme) => {
 		const d = (message.details ?? {}) as { headline?: string; last?: string; error?: boolean };
-		const head = theme.fg(d.error ? "error" : "success", "● ") + theme.fg("toolTitle", `Background ${d.headline ?? ""}`);
+		const title = `Background ${d.headline ?? ""}`;
+		const head = d.error ? theme.fg("error", "● ") + theme.fg("toolTitle", title) : `  ${theme.fg("dim", title)}`;
 		const body = expanded ? String(message.content) : (d.last ?? "");
 		return new Text(`${head}\n${theme.fg("dim", `  └ ${body.replace(/\n/g, "\n    ")}`)}`, 0, 0);
 	});
 	const row = (theme: any, text: string, context: any) => {
-		const color = context.isError ? "error" : context.executionStarted && context.isPartial ? "accent" : "success";
-		return new Text(theme.fg(color, "● ") + theme.fg("toolTitle", text), 0, 0);
+		const color = context.isError ? "error" : context.executionStarted && context.isPartial ? "accent" : undefined;
+		return new Text(color ? theme.fg(color, "● ") + theme.fg("toolTitle", text) : `  ${theme.fg("dim", text)}`, 0, 0);
 	};
 	const note = (theme: any, result: any, expanded: boolean) => {
 		const text = result.content?.map((c: any) => c.text ?? "").join("\n") ?? "";
@@ -293,7 +300,6 @@ export default function (pi: ExtensionAPI) {
 					});
 				});
 
-			if (ctx.mode === "tui") ui = ctx.ui;
 			showJobs();
 			return { content: [{ type: "text", text: `Started ${id}; log: ${log}. You will be notified when it exits.` }], details: { id, log } };
 		},
@@ -395,6 +401,12 @@ export default function (pi: ExtensionAPI) {
 
 	// After /reload or a resume, carry on after the ids already in the conversation so "bg3" keeps meaning one job
 	pi.on("session_start", async (_event, ctx) => {
+		if (ctx.mode === "tui") {
+			ctx.ui.setWidget("background-jobs", (tui, theme) => {
+				redrawJobs = () => tui.requestRender();
+				return jobsWidget(theme);
+			});
+		}
 		for (const entry of ctx.sessionManager.getBranch()) {
 			const msg = entry.type === "message" ? (entry.message as any) : undefined;
 			const n = Number(/^bg(\d+)$/.exec(msg?.role === "toolResult" && msg.toolName === "bg_run" ? String(msg.details?.id) : "")?.[1]);
@@ -403,6 +415,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_shutdown", async () => {
+		clearInterval(ticker);
 		for (const timer of holds.values()) clearTimeout(timer);
 		holds.clear();
 		for (const job of jobs.values()) {

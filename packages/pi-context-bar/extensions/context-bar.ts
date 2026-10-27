@@ -54,10 +54,12 @@ export default function (pi: ExtensionAPI) {
 						theme.fg("muted", "] ") +
 						theme.fg("mdCode", `${fmtTokens(used)}/${fmtTokens(contextWindow)}`) +
 						theme.fg(barColor, ` (${pctUsed.toFixed(0)}%)`);
-					const costSeg = theme.fg("success", `$${cost.toFixed(3)}`);
+					// A local or otherwise free model has no prices, so a cost that's still $0 says nothing
+					const free = !ctx.model?.cost?.input && !ctx.model?.cost?.output;
+					const costSeg = free && cost === 0 ? undefined : theme.fg("success", `$${cost.toFixed(3)}`);
 
 					const sep = theme.fg("dim", " │ ");
-					const line = (barSize: number) => [modelSeg, branchSeg, contextSeg(barSize), costSeg].join(sep);
+					const line = (barSize: number) => [modelSeg, branchSeg, contextSeg(barSize), costSeg].filter(Boolean).join(sep);
 
 					// Shrink the bar before cutting anything off, so the cost stays visible in narrow windows
 					const overflow = visibleWidth(line(BAR_WIDTH)) - width;

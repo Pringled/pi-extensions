@@ -74,18 +74,17 @@ export default function (pi: ExtensionAPI) {
 			const editor = previous?.(tui, theme, keybindings) ?? new CustomEditor(tui, theme, keybindings);
 			redraw = () => tui.requestRender();
 
-			// Tab or → takes the suggestion while the editor is empty; anything else typed dismisses it
+			// Tab or → takes the suggestion while the editor is empty; typing or esc dismisses it, while other keys that
+			// leave the editor empty, such as ctrl+o to expand tool output, keep it
 			const handleInput = editor.handleInput.bind(editor);
 			editor.handleInput = (data: string) => {
-				if (suggestion && editor.getText() === "") {
-					if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
-						editor.setText(suggestion);
-						suggestion = "";
-						return;
-					}
+				if (suggestion && editor.getText() === "" && (matchesKey(data, Key.tab) || matchesKey(data, Key.right))) {
+					editor.setText(suggestion);
 					suggestion = "";
+					return;
 				}
 				handleInput(data);
+				if (suggestion && (editor.getText() !== "" || matchesKey(data, Key.escape))) suggestion = "";
 			};
 
 			const render = editor.render.bind(editor);

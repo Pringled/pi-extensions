@@ -1,5 +1,5 @@
 import { AssistantMessageComponent, CustomEditor, type ExtensionAPI, UserMessageComponent } from "@earendil-works/pi-coding-agent";
-import { Markdown, MouseRegion, Spacer, Text } from "@earendil-works/pi-tui";
+import { Markdown, MouseRegion, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { shortCommand } from "./command.ts";
 
 const PROMPT = "❯";
@@ -119,7 +119,7 @@ export default function (pi: ExtensionAPI) {
 	});
 	pi.on("agent_start", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
-		ctx.ui.setWidget("pi-polish-turn", undefined);
+		showTurn(undefined);
 		started = Date.now();
 		tokens = 0;
 		streamed = 0;
@@ -157,11 +157,25 @@ export default function (pi: ExtensionAPI) {
 		const secs = Math.round((Date.now() - started) / 1000);
 		const took = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
 		const done = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-		ctx.ui.setWidget("pi-polish-turn", (_tui, theme) => new Text(theme.fg("dim", `✻ Worked for ${took} · done ${done}`), 0, 0));
+		showTurn(`✻ Worked for ${took} · done ${done}`);
 	});
 	// A jump in the session tree leaves the turn behind, so its summary goes too
-	pi.on("session_tree", async (_event, ctx) => {
-		if (ctx.hasUI) ctx.ui.setWidget("pi-polish-turn", undefined);
+	pi.on("session_tree", async () => showTurn(undefined));
+	// Set once and updated in place: setting a widget again moves it below the ones other extensions added since,
+	// while the turn line belongs at the top, where the working line was
+	let turnLine: string | undefined;
+	let redrawTurn = () => {};
+	const showTurn = (line: string | undefined) => {
+		turnLine = line;
+		redrawTurn();
+	};
+	pi.on("session_start", async (_event, ctx) => {
+		if (!ctx.hasUI) return;
+		turnLine = undefined;
+		ctx.ui.setWidget("pi-polish-turn", (tui, theme) => {
+			redrawTurn = () => tui.requestRender();
+			return { invalidate() {}, render: (width: number) => (turnLine ? [truncateToWidth(theme.fg("dim", turnLine), width)] : []) };
+		});
 	});
 	pi.on("session_shutdown", async () => clearInterval(timer));
 
