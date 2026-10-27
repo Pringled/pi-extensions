@@ -1,6 +1,5 @@
 import { AssistantMessageComponent, CustomEditor, type ExtensionAPI, UserMessageComponent } from "@earendil-works/pi-coding-agent";
 import { Markdown, MouseRegion, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
-import { shortCommand } from "./command.ts";
 
 const PROMPT = "❯";
 const REPLY = "●";
@@ -90,28 +89,28 @@ export default function (pi: ExtensionAPI) {
 		const stats = `(${secs}s · ↓ ${fmtTokens(tokens + Math.round(streamed / 4))} tokens)`;
 		ctx.ui.setWorkingMessage(`${ORANGE}${phase}…${RESET} ${DIM}${stats}${RESET}`);
 	};
-	const toolPhase = (name: string, args: any) => {
-		const path = String(args?.path ?? "").split("/").pop();
+	// Just the verb for tools that pi-polish draws as live rows, which already show what is running;
+	// other extensions' tools keep their name, since their rows may not
+	const toolPhase = (name: string) => {
 		switch (name) {
 			case "bash":
-				return `Running ${shortCommand(String(args?.command ?? ""), process.cwd()).slice(0, 60)}`;
+				return "Running";
 			case "read":
-				return `Reading ${path}`;
+				return "Reading";
 			case "edit":
-				return `Editing ${path}`;
+				return "Editing";
 			case "write":
-				return `Writing ${path}`;
+				return "Writing";
 			case "grep":
 			case "find":
-				return `Searching for ${String(args?.pattern ?? "").slice(0, 40)}`;
+			case "tool_search":
+				return "Searching";
 			case "bg_run":
 				return "Starting a background job";
 			case "questionnaire":
 				return "Waiting for your answer";
-			case "tool_search":
-				return "Searching tools";
 			default:
-				return name.startsWith("mcp__") ? `Calling ${name.split("__")[1]}/${name.split("__").slice(2).join("__")}` : `Running ${name}`;
+				return name.startsWith("mcp__") ? "Calling" : `Running ${name}`;
 		}
 	};
 	pi.on("session_start", async (_event, ctx) => {
@@ -142,7 +141,7 @@ export default function (pi: ExtensionAPI) {
 	});
 	pi.on("tool_execution_start", async (event, ctx) => {
 		if (!ctx.hasUI) return;
-		phase = toolPhase(event.toolName, event.args);
+		phase = toolPhase(event.toolName);
 		show(ctx);
 	});
 	pi.on("tool_execution_end", async () => {
