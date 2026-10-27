@@ -16,7 +16,7 @@ pi install npm:pi-context-bar
 - The current model, as `provider/model`, and its thinking level.
 - The git branch, or `no git` outside a repository.
 - A context bar with used and total tokens. It turns yellow at 50% and red at 80%.
-- The total cost of the session so far.
+- The total cost of the session so far, left out for local and other free models while it's $0.
 
 It replaces Pi's default footer.
 

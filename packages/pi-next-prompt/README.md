@@ -14,7 +14,7 @@ pi install npm:pi-next-prompt
 ## Usage
 
 - `Tab` or `→` puts the suggestion in the input, so you can send it with `Enter` or edit it first.
-- Typing anything else makes it go away.
+- Typing anything else or `esc` makes it go away. Other keys, such as `ctrl+o` to look at tool output, leave it in place.
 
 There's no suggestion when Pi doesn't see an obvious next step, after an error, or while you have messages queued.
 
