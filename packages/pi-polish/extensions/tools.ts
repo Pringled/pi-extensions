@@ -7,7 +7,7 @@ import {
 	type ExtensionAPI,
 	type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
-import { type Component, Container, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { type Component, Container, stripTerminalSequences, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { shortCommand } from "./command.ts";
 import bash from "@shikijs/langs/shellscript";
 import css from "@shikijs/langs/css";
@@ -76,6 +76,8 @@ interface Member {
 	label: string;
 	done: boolean;
 	error: boolean;
+	// The latest output line of a running shell command
+	latest?: string;
 }
 
 interface Group {
@@ -434,6 +436,8 @@ function oneLine(lines: string[], suffix = ""): Component {
 }
 
 export default function (pi: ExtensionAPI) {
+	// Tells pi-background that its ctrl+b hint goes under the running command's row, drawn below
+	(globalThis as any)[Symbol.for("pi-polish.showsMoveHint")] = true;
 	const cwd = process.cwd();
 	const groupOf = new Map<string, Group>();
 	const rowInvalidate = new Map<string, () => void>();
@@ -524,6 +528,18 @@ export default function (pi: ExtensionAPI) {
 		tick(group);
 		refresh(group);
 	});
+	// Pi streams a running command's output; its row shows the latest line, as a terminal would, redrawn with the timer
+	pi.on("tool_execution_update", async (event) => {
+		const member = groupOf.get(event.toolCallId)?.members.find((m) => m.id === event.toolCallId);
+		if (!member || member.kind !== "bash") return;
+		const text = (event.partialResult?.content ?? []).map((c: any) => c.text ?? "").join("");
+		const latest = text
+			.split("\n")
+			.map((line: string) => (stripTerminalSequences(line).split("\r").filter((part) => part.trim()).at(-1) ?? "").replace(/[\x00-\x1f\x7f]/g, " ").trim())
+			.filter(Boolean)
+			.at(-1);
+		if (latest) member.latest = latest;
+	});
 	pi.on("tool_execution_end", async (event) => {
 		const group = groupOf.get(event.toolCallId);
 		const member = group?.members.find((m) => m.id === event.toolCallId);
@@ -553,7 +569,10 @@ export default function (pi: ExtensionAPI) {
 			// The dot pulses once a second while the group runs, in step with the seconds counter
 			const pulse = secs % 2 ? "dim" : "accent";
 			const head = theme.fg(pulse, `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
-			return oneLine([head, theme.fg("dim", `  └ ${active.label}`)]);
+			const latest = active.latest ? [theme.fg("dim", `    ${active.latest}`)] : [];
+			// pi-background marks commands that ctrl+b can move to the background
+			const movable = (globalThis as any)[Symbol.for("pi-background.movable")]?.has(active.id) ? [theme.fg("dim", "    (ctrl+b to run in background)")] : [];
+			return oneLine([head, theme.fg("dim", `  └ ${active.label}`), ...latest, ...movable]);
 		}
 		// Finished rows go quiet, like Claude Code's: dim text, with a red ● only when something failed
 		const mark = failed ? theme.fg("error", `${MARK} `) : "  ";
