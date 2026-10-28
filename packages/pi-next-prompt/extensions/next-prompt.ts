@@ -74,8 +74,8 @@ export default function (pi: ExtensionAPI) {
 			const editor = previous?.(tui, theme, keybindings) ?? new CustomEditor(tui, theme, keybindings);
 			redraw = () => tui.requestRender();
 
-			// Tab or → takes the suggestion while the editor is empty; typing or esc dismisses it, while other keys that
-			// leave the editor empty, such as ctrl+o to expand tool output, keep it
+			// Tab or → takes the suggestion while the editor is empty. It only shows while the editor is empty, so typing hides it
+			// and it comes back when the text is deleted again, like in Claude Code; esc dismisses it until the next reply
 			const handleInput = editor.handleInput.bind(editor);
 			editor.handleInput = (data: string) => {
 				if (suggestion && editor.getText() === "" && (matchesKey(data, Key.tab) || matchesKey(data, Key.right))) {
@@ -84,7 +84,7 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 				handleInput(data);
-				if (suggestion && (editor.getText() !== "" || matchesKey(data, Key.escape))) suggestion = "";
+				if (suggestion && matchesKey(data, Key.escape)) suggestion = "";
 			};
 
 			const render = editor.render.bind(editor);

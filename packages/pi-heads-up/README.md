@@ -1,6 +1,6 @@
 # pi-heads-up
 
-After [Pi](https://pi.dev) finishes a task, a quick second look at the conversation flags the one thing you might have missed: a tradeoff Pi made without saying so, something it didn't check, or a change beyond what you asked for.
+After [Pi](https://pi.dev) finishes a task, a quick second look at the conversation flags the one thing you might have missed that changes what you should do next: a claim Pi didn't actually check, a result that looks wrong, a tradeoff it made without saying so, or a change beyond what you asked for. Most tasks get no heads-up.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-heads-up-dark.gif">
