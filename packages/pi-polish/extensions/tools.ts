@@ -7,7 +7,7 @@ import {
 	type ExtensionAPI,
 	type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
-import { type Component, Container, stripTerminalSequences, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { type Component, Container, MouseRegion, stripTerminalSequences, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { shortCommand } from "./command.ts";
 import bash from "@shikijs/langs/shellscript";
 import css from "@shikijs/langs/css";
@@ -85,6 +85,8 @@ interface Group {
 	started: number;
 	ended?: number;
 	timer?: NodeJS.Timeout;
+	// Opened by a click, so it shows in full like ctrl+o does, but on its own
+	open?: boolean;
 }
 
 type Result = { content: Array<{ type: string; text?: string }>; details?: unknown };
@@ -554,8 +556,8 @@ export default function (pi: ExtensionAPI) {
 	/** Collapsed rendering for a grouped tool row; the group's first row draws the whole group. */
 	const renderGrouped = (toolCallId: string, theme: any, context: any): Component | undefined => {
 		rowInvalidate.set(toolCallId, context.invalidate);
-		if (context.expanded) return undefined;
 		const group = groupOf.get(toolCallId);
+		if (context.expanded || group?.open) return undefined;
 		// Live rows wait for tool_execution_start to place them; history rows without a group render alone
 		if (!group) return live || !ready ? empty() : undefined;
 		if (group.members[0].id !== toolCallId) return empty();
@@ -576,10 +578,20 @@ export default function (pi: ExtensionAPI) {
 		}
 		// Finished rows go quiet, like Claude Code's: dim text, with a red ● only when something failed
 		const mark = failed ? theme.fg("error", `${MARK} `) : "  ";
-		// Always the summary, even for one call ("Ran 1 shell command"), like Claude Code; ctrl+o shows each one
+		// Always the summary, even for one call ("Ran 1 shell command"), like Claude Code; a click or ctrl+o shows each one
 		const text = summary(group, false);
-		return oneLine([mark + theme.fg("dim", text)], failNote);
+		return clickable(group, oneLine([mark + theme.fg("dim", text)], failNote));
 	};
+
+	/** A row that opens or closes its group when clicked. */
+	const clickable = (group: Group, row: Component): Component =>
+		new MouseRegion(row, (event) => {
+			if (event.type !== "click" || event.button !== "left") return undefined;
+			group.open = !group.open;
+			refresh(group);
+			return { handled: true };
+		});
+	const isOpen = (context: { expanded?: boolean; toolCallId?: string }) => Boolean(context.expanded || groupOf.get(context.toolCallId ?? "")?.open);
 
 	// The ● carries the status, like Claude Code: dim while arguments stream, accent while running, green or red when done.
 	// History rows redrawn after /reload have no execution state, so they count as done.
@@ -597,20 +609,23 @@ export default function (pi: ExtensionAPI) {
 			const grouped = renderGrouped(context.toolCallId, theme, context);
 			if (grouped) return grouped;
 			// Expanded, a shell command shows in full, with its cd and every line; collapsed rows keep the short label
-			const command = context.expanded && toolName === "bash" ? String(args?.command ?? "").trim().split("\n") : undefined;
+			const command = isOpen(context) && toolName === "bash" ? String(args?.command ?? "").trim().split("\n") : undefined;
 			const text = command ? `$ ${command.slice(0, 60).join("\n")}${command.length > 60 ? `\n... ${command.length - 60} more lines` : ""}` : truncateToWidth(label(toolName, args, cwd), 400);
 			// Finished rows are dim without a dot; running and failed ones keep it
 			const done = status(context) === "success";
 			const mark = done ? "  " : dot(theme, context);
 			// Wrapped lines continue under the text, past the dot, instead of at the left edge
-			return {
+			const row = {
 				invalidate() {},
 				render: (width: number) =>
 					wrapTextWithAnsi(text, Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + theme.fg(done ? "dim" : "toolTitle", line)),
 			};
+			// A row of a group opened by a click closes it again
+			const group = groupOf.get(context.toolCallId);
+			return group?.open ? clickable(group, row) : row;
 		},
-		renderResult(result, { expanded }, theme) {
-			if (!expanded) return empty();
+		renderResult(result, { expanded }, theme, context) {
+			if (!expanded && !isOpen(context)) return empty();
 			return new Text(expandedBody(theme, resultText(result as Result)), 0, 0);
 		},
 	});
@@ -666,7 +681,7 @@ export default function (pi: ExtensionAPI) {
 		return {
 			...own,
 			renderResult: (result, options, theme, context) =>
-				options.expanded && pis ? pis(result, options, theme, { ...context, lastComponent: undefined }) : own.renderResult!(result, options, theme, context),
+				isOpen({ expanded: options.expanded, toolCallId: context.toolCallId }) && pis ? pis(result, { ...options, expanded: true }, theme, { ...context, lastComponent: undefined }) : own.renderResult!(result, options, theme, context),
 		};
 	});
 
