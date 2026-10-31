@@ -3,7 +3,7 @@ import { normalizeContext } from "@earendil-works/pi-ai";
 import { convertToLlm, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
-const PROMPT = `[Recap mode] The user stepped away from this session and is coming back to it. In one or two plain sentences, at most 40 words, recap where things stand: what was being worked on, what got done and what is next or waiting on them. Plain text without markdown, no preamble.`;
+const PROMPT = `[Recap mode] The user stepped away from this session and is coming back to it. In one or two plain sentences, at most 40 words, recap where things stand: what was being worked on, what got done and what is next or waiting on them. Plain text without markdown, no preamble, in the user's language.`;
 // Within the prompt cache's 5 minutes, so the recap reuses it
 const DELAY_MS = 3 * 60_000;
 const MIN_TURNS = 3;
