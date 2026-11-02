@@ -207,13 +207,22 @@ export default function (pi: ExtensionAPI) {
 		render(width: number) {
 			if (jobsLine() === "off") return [];
 			const live = running().filter((job) => job !== viewing);
-			const lines = live.slice(0, MAX_SHOWN_JOBS).map((job) => {
-				const silent = Date.now() - (job.lastOutput ?? job.started);
-				const detail = silent >= SILENT_AFTER_MS ? ` · no output for ${duration(silent)}` : jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : "";
-				const text = theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${job.id} ${shownCommand(job.command)}`) + theme.fg("dim", ` · ${elapsed(job)}${detail}`);
-				return truncateToWidth(text, width);
-			});
-			if (live.length > MAX_SHOWN_JOBS) lines.push(theme.fg("dim", `  and ${live.length - MAX_SHOWN_JOBS} more`));
+			const silentFor = (job: Job) => Date.now() - (job.lastOutput ?? job.started);
+			let lines: string[];
+			if (live.length <= MAX_SHOWN_JOBS) {
+				lines = live.map((job) => {
+					const silent = silentFor(job);
+					const detail = silent >= SILENT_AFTER_MS ? ` · no output for ${duration(silent)}` : jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : "";
+					const text = theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${job.id} ${shownCommand(job.command)}`) + theme.fg("dim", ` · ${elapsed(job)}${detail}`);
+					return truncateToWidth(text, width);
+				});
+			} else {
+				// Past a few jobs, a line each crowds the input, so they share one with just the count, and a warning when
+				// some have gone quiet, since they may be stuck; /bg has the rest
+				const silent = live.filter((job) => silentFor(job) >= SILENT_AFTER_MS).length;
+				const warning = silent ? theme.fg("warning", ` · ${silent} silent for ${SILENT_AFTER_MS / 60_000}m+`) : "";
+				lines = [truncateToWidth(theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${live.length} jobs`) + warning, width)];
+			}
 			if (hinted.size > 0 && !(globalThis as any)[Symbol.for("pi-polish.showsMoveHint")]) lines.push(theme.fg("dim", "  ctrl+b to run in background"));
 			return lines;
 		},

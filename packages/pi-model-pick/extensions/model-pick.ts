@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { type ExtensionAPI, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionContext, getAgentDir, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { Container, fuzzyFilter, getKeybindings, Input, Key, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 
 const STATE_PATH = join(getAgentDir(), "model-picker-state.json");
@@ -60,10 +60,23 @@ export default function (pi: ExtensionAPI) {
 		state = loadState();
 	});
 
-	pi.on("model_select", (event) => {
+	// The model picked last becomes the default for new sessions, unless "modelPick": { "rememberLast": false } is in
+	// Pi's settings.json; Pi itself only saves a default on ctrl+s in /model
+	const rememberLast = () => (pi.getSettings() as { modelPick?: { rememberLast?: boolean } }).modelPick?.rememberLast !== false;
+
+	pi.on("model_select", async (event, ctx) => {
 		const k = key(event.model);
 		state.recents = [k, ...state.recents.filter((r) => r !== k)].slice(0, MAX_RECENTS);
 		saveState(state);
+		// Every switch counts (/pick, /model, ctrl+p), except a resumed session bringing back its own model
+		if (event.source === "restore" || !rememberLast()) return;
+		try {
+			const settings = SettingsManager.create(ctx.cwd);
+			settings.setDefaultModelAndProvider(event.model.provider, event.model.id);
+			await settings.flush();
+		} catch {
+			// Not being able to save the default never gets in the way of switching models
+		}
 	});
 
 	function buildRows(available: Model<Api>[], query: string): Row[] {

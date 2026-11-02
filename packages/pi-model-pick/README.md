@@ -16,7 +16,15 @@ pi install npm:pi-model-pick
 - `/pick` or `ctrl+shift+m` opens the picker: favorites first, then the last 8 models you used, then all models. Type to filter.
 - `/fav` stars or unstars the current model.
 
-Favorites and recents are kept in `~/.pi/agent/model-picker-state.json`. Pi's own `/model` picker is unchanged.
+Favorites and recents are kept in `~/.pi/agent/model-picker-state.json`. Pi's own `/model` picker stays available.
+
+## Settings
+
+A model you pick, with `/pick`, `/model` or `ctrl+p`, also becomes the default, so new sessions start on the model you used last. Resuming a session brings back that session's model without changing the default. To keep Pi's own behaviour, where only `ctrl+s` in `/model` saves a default, add this to `~/.pi/agent/settings.json`:
+
+```json
+"modelPick": { "rememberLast": false }
+```
 
 ## License
 
