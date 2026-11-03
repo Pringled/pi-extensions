@@ -22,7 +22,7 @@ Run `/feedback`. Your browser opens with everything on the current branch since 
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-feedback-browser-light.png" alt="Pi's changes in difit, with two comments on the diff">
 </picture>
 
-When you're done, press **Send to Pi** in the bottom-right corner, or run `/feedback` again in Pi. Your comments go to Pi as one message:
+Press **Send to Pi** in the bottom-right corner. Your comments go to Pi as one message:
 
 ```
 Here's my feedback on the changes against main:
@@ -34,8 +34,11 @@ test_stats.py:L14
 Also test an even number of values
 ```
 
-If Pi is busy, the message waits until it's done. If you didn't leave any comments, nothing is sent. Closing or reloading the tab doesn't end it, and the view updates by itself when files change, so you can keep it open while Pi works.
+If Pi is busy, the message waits until it's done. If you didn't leave any comments, nothing is sent.
 
+The tab then shows only what Pi changes from there, and updates as Pi works: comment on that and send again, as many rounds as you like. Press **Done**, or run `/feedback` again in Pi, to finish; comments you haven't sent yet go to Pi then. Closing or reloading the tab doesn't end the review.
+
+- `/feedback since` opens a new review of what changed after you last sent feedback. When you send, pi-feedback saves the files as they were, in a ref under `refs/pi-feedback/` that isn't a branch and isn't pushed; untracked files over 1 MB are left out.
 - `/feedback dev` compares with another branch instead of the default one.
 - On `main` itself, `/feedback` shows your uncommitted changes.
 - If the browser didn't open, for example because Pi runs in a sandbox, the address is shown above Pi's input.
