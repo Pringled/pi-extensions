@@ -670,9 +670,38 @@ export default function (pi: ExtensionAPI) {
 			return [`Wrote ${lineCount(lines.length)}`, lines.map((line, i) => `+${String(i + 1).padStart(width)} ${line}`)];
 		}),
 	};
+	// Other extensions' tools keep their own drawing, without pi's colored box: indented under the status dot like
+	// the rows above. Their renderer gets back its own component, not the wrapper, to reuse.
+	type Framed = Component & { inner: Component };
+	const frame = (inner: Component, mark: string): Framed => ({
+		inner,
+		invalidate: () => inner.invalidate(),
+		render: (width: number) => inner.render(Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + line),
+	});
+	const unframed = <C extends { lastComponent?: Component }>(context: C): C => ({ ...context, lastComponent: (context.lastComponent as Framed | undefined)?.inner });
+	const otherTool = (toolName: string, own: ToolRenderers): ToolRenderers => ({
+		renderShell: "self",
+		renderCall(args: any, theme, context) {
+			const mark = status(context) === "success" ? "  " : dot(theme, context);
+			const first = Object.values(args ?? {}).find((v) => typeof v === "string") as string | undefined;
+			const fallback = () => new Text(theme.fg("toolTitle", theme.bold(toolName)) + (first ? theme.fg("dim", ` ${first.split("\n")[0]}`) : ""), 0, 0);
+			return frame(own.renderCall ? own.renderCall(args, theme, unframed(context)) : fallback(), mark);
+		},
+		renderResult(result, options, theme, context) {
+			if (own.renderResult) return frame(own.renderResult(result, options, theme, unframed(context)), "  ");
+			const text = resultText(result as Result);
+			return options.expanded && text ? frame(new Text(expandedBody(theme, text), 0, 0), "  ") : empty();
+		},
+	});
+
 	// Only the drawing changes: pi's own tools keep running, with their own schema and on/off state
 	pi.registerToolRenderer((toolName, next) => {
-		if (renderers[toolName] || !kindOf(toolName)) return renderers[toolName] ?? next();
+		if (renderers[toolName]) return renderers[toolName];
+		if (!kindOf(toolName)) {
+			const own = next();
+			// Tools that draw their own frame, like bg_run, already fit in
+			return own && own.renderShell !== "self" ? otherTool(toolName, own) : own;
+		}
 		const own = groupedTool(toolName);
 		if (kindOf(toolName) !== "mcp") return own;
 		// Expanded MCP results keep pi's own view, which shows images and limits long one-line JSON. It gets

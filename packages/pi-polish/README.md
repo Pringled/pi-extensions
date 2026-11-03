@@ -17,12 +17,13 @@ pi install npm:pi-polish
 - Edits and new files show as diffs with syntax highlighting and the changed words marked, in colors that follow your Pi theme, dark or light.
 - Reads, searches, shell commands and MCP calls show a pulsing dot in your theme's accent color while they run, then turn into a quiet grey row once done, with a red dot if one failed. Edits and writes keep a green dot with their diff.
 - An orange status line shows what Pi is doing, how long it has been at it and how many tokens it has written. When Pi finishes, a dim line says how long it worked and when it was done.
+- Tools from other extensions keep their own look, but without Pi's colored box: they sit under the same status dot as the other rows.
 - `❯` marks your messages and `●` marks Pi's replies.
 - A short instruction to the model to change files with Pi's edit and write tools instead of shell commands like `sed -i`, so you see the changes as diffs.
 
 ## Compatibility
 
-pi-polish only changes how Pi's built-in tools and MCP tools are drawn; the tools themselves run exactly as before. The chat styling (the markers and the status line) reaches into Pi's internal UI, so a new Pi release can break that part of the look until pi-polish is updated. Your sessions are never affected. Tested with Pi 1.4.
+pi-polish only changes how tools are drawn; the tools themselves run exactly as before. The chat styling (the markers and the status line) reaches into Pi's internal UI, so a new Pi release can break that part of the look until pi-polish is updated. Your sessions are never affected. Tested with Pi 1.4.
 
 ## License
 
