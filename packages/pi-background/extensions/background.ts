@@ -105,8 +105,10 @@ export default function (pi: ExtensionAPI) {
 	const ops = createLocalBashOperations();
 	let next = 1;
 
+	// While Pi is working, the message is steered in before its next step instead of following up after the whole run,
+	// which for a long run left results hours late and woke Pi once per stale message when the run ended
 	const wake = (content: string, details: { headline: string; last: string; error: boolean }, triggerTurn = true) =>
-		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "followUp" });
+		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "steer" });
 
 	// Jobs started in the same turn usually belong together, like several benchmarks to compare. While some of them
 	// still run, a successful one's result is added to the conversation without waking Pi, so it answers once at the
@@ -420,7 +422,7 @@ export default function (pi: ExtensionAPI) {
 			"Use bg_run instead of bash for any command that may take longer than about 30 seconds, in particular: downloading large files, datasets, dumps or model weights; " +
 				"installing heavy packages (torch, tensorflow, CUDA libraries, transformers, large requirement sets) or creating environments with them; cloning large repositories; " +
 				"builds, compiles and docker builds; full test suites of non-trivial projects; training, evaluation, benchmark and data-processing scripts; and anything that sleeps, waits or polls.",
-			"When unsure whether a command is quick, prefer bg_run: a quick job just reports back sooner, while a long bash command blocks the user until it finishes.",
+			"Run quick checks, short scripts and test files that likely finish within a minute with bash, even when you're not sure: their result is needed now, and each bg_run job reports back as a separate message.",
 			"After bg_run, continue with independent work or end your turn; a message with the exit code and log tail arrives automatically when the job exits, so never sleep, poll or tail the log to wait for it.",
 			"Keep using bash for quick commands whose output you need right away, such as git, ls, cat, grep, find, file inspection and short checks.",
 			"Pass wake_on only when you must act before a bg_run job ends, such as a server becoming ready to test against, or when the user asked to follow its progress. Make it a pattern for that one event, which matches once, not a line the job prints for every item, file, epoch or step. To report a job's result, leave wake_on out: the exit message already brings the exit code and last lines.",
