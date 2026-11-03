@@ -102,7 +102,6 @@ class MovedToBackground extends Error {
 
 export default function (pi: ExtensionAPI) {
 	const jobs = new Map<string, Job>();
-	const ops = createLocalBashOperations();
 	let next = 1;
 
 	// While Pi is working, the message is steered in before its next step instead of following up after the whole run,
@@ -454,9 +453,13 @@ export default function (pi: ExtensionAPI) {
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const pattern = params.wake_on ? wakePattern(params.wake_on) : undefined;
 			const controller = new AbortController();
+			// The same shell and command prefix as Pi's own bash, from settings.json; without shellPath, Windows can pick WSL's bash
+			const { shellPath, shellCommandPrefix } = pi.getSettings();
+			const ops = createLocalBashOperations({ shellPath });
 			// Output goes to a pipe, where Python would buffer prints until it exits; unbuffered, the latest line and wake_on stay live
+			const command = `export PYTHONUNBUFFERED=1; ${params.command}`;
 			const { id, log } = startJob(params.command, pattern, controller, (onData) =>
-				ops.exec(`export PYTHONUNBUFFERED=1; ${params.command}`, params.cwd ?? ctx.cwd, { onData, signal: controller.signal }),
+				ops.exec(shellCommandPrefix ? `${shellCommandPrefix}\n${command}` : command, params.cwd ?? ctx.cwd, { onData, signal: controller.signal }),
 			);
 			return { content: [{ type: "text", text: `Started ${id}; log: ${log}. You will be notified when it exits.` }], details: { id, log } };
 		},
