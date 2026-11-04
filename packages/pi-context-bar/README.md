@@ -17,7 +17,7 @@ pi install npm:pi-context-bar
 - The git branch, or `no git` outside a repository.
 - A context bar with used and total tokens. It turns yellow at 50% and red at 80%.
 - The total cost of the session so far, left out for local and other free models while it's $0.
-- Short statuses from other extensions, which Pi's own footer would show on a line of their own.
+- Statuses other extensions set, such as a quota or a running job, when there's room for them.
 
 It replaces Pi's default footer.
 
