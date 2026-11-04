@@ -58,13 +58,25 @@ export default function (pi: ExtensionAPI) {
 					const free = !ctx.model?.cost?.input && !ctx.model?.cost?.output;
 					const costSeg = free && cost === 0 ? undefined : theme.fg("success", `$${cost.toFixed(3)}`);
 
+					// Other extensions' statuses (setStatus) go last, sorted by key and on one line, like in Pi's own footer
+					const statuses = [...footerData.getExtensionStatuses()]
+						.sort(([a], [b]) => a.localeCompare(b))
+						.map(([, text]) => text.replace(/\s+/g, " ").trim())
+						.filter(Boolean);
+
 					const sep = theme.fg("dim", " │ ");
 					const line = (barSize: number) => [modelSeg, branchSeg, contextSeg(barSize), costSeg].filter(Boolean).join(sep);
 
 					// Shrink the bar before cutting anything off, so the cost stays visible in narrow windows
 					const overflow = visibleWidth(line(BAR_WIDTH)) - width;
 					const barSize = Math.max(MIN_BAR_WIDTH, BAR_WIDTH - Math.max(0, overflow));
-					return [truncateToWidth(line(barSize), width)];
+					// Statuses only show when they fit whole
+					let out = line(barSize);
+					for (const status of statuses) {
+						if (visibleWidth(out + sep + status) > width) break;
+						out += sep + status;
+					}
+					return [truncateToWidth(out, width)];
 				},
 			};
 		});
