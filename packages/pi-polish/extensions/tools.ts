@@ -57,8 +57,8 @@ const DIFF_PREVIEW_LINES = 16;
 const BG_RESET = "\x1b[49m";
 const FG_RESET = "\x1b[39m";
 
-type Kind = "bash" | "read" | "search" | "list" | "tools" | "mcp";
-const KIND_OF: Record<string, Kind> = { bash: "bash", read: "read", grep: "search", find: "search", ls: "list", tool_search: "tools" };
+type Kind = "bash" | "read" | "search" | "list" | "tools" | "mcp" | "code";
+const KIND_OF: Record<string, Kind> = { bash: "bash", read: "read", grep: "search", find: "search", ls: "list", tool_search: "tools", codemode: "code" };
 // Pi names MCP tools mcp__<server>__<tool>
 const kindOf = (toolName: string): Kind | undefined => KIND_OF[toolName] ?? (toolName.startsWith("mcp__") ? "mcp" : undefined);
 const VERBS: Record<Kind, [done: string, running: string, one: string, many: string]> = {
@@ -68,6 +68,7 @@ const VERBS: Record<Kind, [done: string, running: string, one: string, many: str
 	list: ["Listed", "Listing", "directory", "directories"],
 	tools: ["Ran", "Running", "tool search", "tool searches"],
 	mcp: ["Called", "Calling", "MCP tool", "MCP tools"],
+	code: ["Ran", "Running", "codemode script", "codemode scripts"],
 };
 
 interface Member {
@@ -118,6 +119,11 @@ function label(toolName: string, args: any, cwd: string): string {
 			return `Search tools "${args?.query ?? ""}"`;
 		case "ls":
 			return `List ${args?.path ? shortPath(args.path, cwd) : "."}`;
+		case "codemode": {
+			// The script's first line of code, which usually names the tool it calls
+			const first = String(args?.code ?? "").split("\n").map((l) => l.trim()).find(Boolean);
+			return `codemode${first ? ` ${first}` : ""}`;
+		}
 		default: {
 			// server/tool like pi's own MCP rows, with the first text argument, which is usually the query
 			const [, server, ...tool] = toolName.split("__");
@@ -608,9 +614,11 @@ export default function (pi: ExtensionAPI) {
 		renderCall(args: any, theme, context) {
 			const grouped = renderGrouped(context.toolCallId, theme, context);
 			if (grouped) return grouped;
-			// Expanded, a shell command shows in full, with its cd and every line; collapsed rows keep the short label
-			const command = isOpen(context) && toolName === "bash" ? String(args?.command ?? "").trim().split("\n") : undefined;
-			const text = command ? `$ ${command.slice(0, 60).join("\n")}${command.length > 60 ? `\n... ${command.length - 60} more lines` : ""}` : truncateToWidth(label(toolName, args, cwd), 400);
+			// Expanded, a shell command or a codemode script shows in full, with every line; collapsed rows keep the short label
+			const source = toolName === "bash" ? args?.command : toolName === "codemode" ? args?.code : undefined;
+			const lines = isOpen(context) && source !== undefined ? String(source ?? "").trim().split("\n") : undefined;
+			const prefix = toolName === "bash" ? "$ " : "codemode\n";
+			const text = lines ? `${prefix}${lines.slice(0, 60).join("\n")}${lines.length > 60 ? `\n... ${lines.length - 60} more lines` : ""}` : truncateToWidth(label(toolName, args, cwd), 400);
 			// Finished rows are dim without a dot; running and failed ones keep it
 			const done = status(context) === "success";
 			const mark = done ? "  " : dot(theme, context);
@@ -703,9 +711,10 @@ export default function (pi: ExtensionAPI) {
 			return own && own.renderShell !== "self" ? otherTool(toolName, own) : own;
 		}
 		const own = groupedTool(toolName);
-		if (kindOf(toolName) !== "mcp") return own;
-		// Expanded MCP results keep pi's own view, which shows images and limits long one-line JSON. It gets
-		// no lastComponent, since that may be the empty component drawn while the row was collapsed.
+		if (kindOf(toolName) !== "mcp" && kindOf(toolName) !== "code") return own;
+		// Expanded MCP and codemode results keep pi's own view, which shows images, limits long one-line JSON and
+		// lists a script's nested calls. It gets no lastComponent, since that may be the empty component drawn
+		// while the row was collapsed.
 		const pis = next()?.renderResult;
 		return {
 			...own,
