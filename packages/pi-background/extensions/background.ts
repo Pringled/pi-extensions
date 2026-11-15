@@ -383,8 +383,15 @@ export default function (pi: ExtensionAPI) {
 	// Only Pi's own bash is wrapped; one that another extension replaced, such as a sandbox's, is left alone. By
 	// session_start every extension has registered its tools, whichever order they loaded in.
 	let wrapped = false;
+	// bg_run spawns its own shell, which would run outside such a sandbox, so it's switched off then
+	let foreignBash = false;
 	pi.on("session_start", async () => {
-		if (wrapped || !pi.getAllTools().find((tool) => tool.name === "bash")?.sourceInfo.path.startsWith("builtin:")) return;
+		if (wrapped) return;
+		foreignBash = !pi.getAllTools().find((tool) => tool.name === "bash")?.sourceInfo.path.startsWith("builtin:");
+		if (foreignBash) {
+			pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "bg_run"));
+			return;
+		}
 		wrapped = true;
 		const pisBash = createBashToolDefinition(process.cwd());
 		pi.registerTool({
@@ -451,6 +458,7 @@ export default function (pi: ExtensionAPI) {
 			),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			if (foreignBash) throw new Error("bg_run is off because another extension, such as a sandbox, provides bash, and a job would run outside it. Use bash instead.");
 			const pattern = params.wake_on ? wakePattern(params.wake_on) : undefined;
 			const controller = new AbortController();
 			// The same shell and command prefix as Pi's own bash, from settings.json; without shellPath, Windows can pick WSL's bash
