@@ -528,6 +528,8 @@ export default function (pi: ExtensionAPI) {
 		if (msg.role === "assistant" && (msg.content ?? []).some((c: any) => c.type === "text" && c.text.trim())) current = undefined;
 	});
 	pi.on("tool_execution_start", async (event) => {
+		// Calls a codemode script makes show inside its own row, so they don't join or end a group
+		if (event.parentToolCallId) return;
 		if (!kindOf(event.toolName)) {
 			current = undefined;
 			return;
