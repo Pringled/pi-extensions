@@ -28,6 +28,10 @@ const MAX_LISTED_FINISHED = 10;
 const HINT_AFTER_MS = 3000;
 // How long finished results wait for jobs started alongside them before Pi is woken anyway
 const GROUP_HOLD_MS = 2 * 60_000;
+// How long a non-interactive run waits for running jobs before it exits anyway, since a job that never ends, such as a server, must not hang it
+const SETTLE_WAIT_CAP_MS = 30 * 60_000;
+// How often that wait looks again, short enough to notice a finishing job straight away
+const SETTLE_POLL_MS = 250;
 
 interface Job {
 	id: string;
@@ -162,9 +166,13 @@ export default function (pi: ExtensionAPI) {
 	let next = 1;
 
 	// While Pi is working, the message is steered in before its next step instead of following up after the whole run,
-	// which for a long run left results hours late and woke Pi once per stale message when the run ended
-	const wake = (content: string, details: { headline: string; last: string; error: boolean }, triggerTurn = true) =>
-		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "steer" });
+	// which for a long run left results hours late and woke Pi once per stale message when the run ended.
+	// triggerWakes counts those that ask for a turn, so a non-interactive run knows one is queued for it
+	let triggerWakes = 0;
+	const wake = (content: string, details: { headline: string; last: string; error: boolean }, triggerTurn = true) => {
+		if (triggerTurn) triggerWakes++;
+		return pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "steer" });
+	};
 
 	// Jobs started in the same turn usually belong together, like several benchmarks to compare. While some of them
 	// still run, a successful one's result is added to the conversation without waking Pi, so it answers once at the
@@ -654,6 +662,17 @@ export default function (pi: ExtensionAPI) {
 			const msg = entry.type === "message" ? (entry.message as any) : undefined;
 			const n = Number(/^bg(\d+)$/.exec(msg?.role === "toolResult" && msg.toolName === "bg_run" ? String(msg.details?.id) : "")?.[1]);
 			if (n >= next) next = n + 1;
+		}
+	});
+
+	// pi -p and --mode json exit as soon as the agent settles, and session_shutdown stops the jobs with it, so wait for
+	// them here instead: a queued wake makes Pi continue and read the result. The TUI and rpc never wait: someone is chatting there
+	pi.on("agent_before_settle", async (_event, ctx) => {
+		if (ctx.mode !== "print" && ctx.mode !== "json") return;
+		const seen = triggerWakes;
+		const until = Date.now() + SETTLE_WAIT_CAP_MS;
+		while (running().length > 0 && triggerWakes === seen && Date.now() < until) {
+			await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
 		}
 	});
 
