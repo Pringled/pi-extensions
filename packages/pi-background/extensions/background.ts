@@ -1,7 +1,14 @@
-import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
+import { closeSync, createWriteStream, fstatSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { type BashOperations, createBashToolDefinition, createLocalBashOperations, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+	type BashOperations,
+	createBashToolDefinition,
+	createLocalBashOperations,
+	type ExtensionAPI,
+	type ExtensionContext,
+	type ExtensionToolContext,
+} from "@earendil-works/pi-coding-agent";
 import { Key, matchesKey, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { shortCommand } from "./command.ts";
@@ -91,6 +98,56 @@ function shownCommand(command: string): string {
 function wakePattern(source: string): RegExp {
 	const insensitive = source.startsWith("(?i)");
 	return new RegExp(insensitive ? source.slice(4) : source, insensitive ? "i" : "");
+}
+
+/** Runs a command through the registered bash tool, such as a sandbox's, which another extension can't reach directly. */
+async function throughBash(ctx: ExtensionToolContext, command: string, signal: AbortSignal, onData: (d: Buffer) => void): Promise<{ exitCode: number | null }> {
+	let seen = "";
+	let sent = 0;
+	let full: string | undefined;
+	const pass = (d: Buffer) => {
+		sent += d.length;
+		if (d.length) onData(d);
+	};
+	// Once output outgrows the tail an update holds, bash saves all of it to a file, which is read from where the updates left off
+	const fromFile = () => {
+		if (!full) return;
+		let fd: number;
+		try {
+			fd = openSync(full, "r");
+		} catch {
+			// Not created yet; a later update or the read at the end gets it
+			return;
+		}
+		try {
+			const d = Buffer.alloc(Math.max(0, fstatSync(fd).size - sent));
+			pass(d.subarray(0, readSync(fd, d, 0, d.length, sent)));
+		} finally {
+			closeSync(fd);
+		}
+	};
+	const outcome = await ctx.executeTool("bash", { command }, {
+		signal,
+		onUpdate: (partial) => {
+			full ??= (partial.details as any)?.fullOutputPath;
+			if (full) return fromFile();
+			// Each update holds the output so far, or only its tail from a bash without the file; what follows the previous one is new
+			const text = partial.content.map((c: any) => c.text ?? "").join("");
+			const anchor = seen.slice(-256);
+			const found = text.lastIndexOf(anchor);
+			const at = text.startsWith(seen) ? seen.length : found < 0 ? 0 : found + anchor.length;
+			pass(Buffer.from(text.slice(at)));
+			seen = text;
+		},
+	});
+	// The file is complete only once bash has finished
+	fromFile();
+	if (signal.aborted) throw new Error("killed");
+	const text = outcome.result.content.map((c: any) => c.text ?? "").join("");
+	const code = (outcome.result.structuredContent as any)?.exit_code ?? /Command exited with code (\d+)$/.exec(text)?.[1];
+	if (code !== undefined) return { exitCode: Number(code) };
+	if (outcome.isError) throw new Error(text.trimEnd().split("\n").at(-1) || "bash failed");
+	return { exitCode: 0 };
 }
 
 /** Thrown by the bash operations below when a command moves to the background, carrying the job and its output so far. */
@@ -383,15 +440,12 @@ export default function (pi: ExtensionAPI) {
 	// Only Pi's own bash is wrapped; one that another extension replaced, such as a sandbox's, is left alone. By
 	// session_start every extension has registered its tools, whichever order they loaded in.
 	let wrapped = false;
-	// bg_run spawns its own shell, which would run outside such a sandbox, so it's switched off then
+	// bg_run then runs its jobs through that bash, so they stay inside such a sandbox
 	let foreignBash = false;
 	pi.on("session_start", async () => {
 		if (wrapped) return;
 		foreignBash = !pi.getAllTools().find((tool) => tool.name === "bash")?.sourceInfo.path.startsWith("builtin:");
-		if (foreignBash) {
-			pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "bg_run"));
-			return;
-		}
+		if (foreignBash) return;
 		wrapped = true;
 		const pisBash = createBashToolDefinition(process.cwd());
 		pi.registerTool({
@@ -458,7 +512,6 @@ export default function (pi: ExtensionAPI) {
 			),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			if (foreignBash) throw new Error("bg_run is off because another extension, such as a sandbox, provides bash, and a job would run outside it. Use bash instead.");
 			const pattern = params.wake_on ? wakePattern(params.wake_on) : undefined;
 			const controller = new AbortController();
 			// The same shell and command prefix as Pi's own bash, from settings.json; without shellPath, Windows can pick WSL's bash
@@ -467,7 +520,9 @@ export default function (pi: ExtensionAPI) {
 			// Output goes to a pipe, where Python would buffer prints until it exits; unbuffered, the latest line and wake_on stay live
 			const command = `export PYTHONUNBUFFERED=1; ${params.command}`;
 			const { id, log } = startJob(params.command, pattern, controller, (onData) =>
-				ops.exec(shellCommandPrefix ? `${shellCommandPrefix}\n${command}` : command, params.cwd ?? ctx.cwd, { onData, signal: controller.signal }),
+				foreignBash
+					? throughBash(ctx, params.cwd ? `cd '${params.cwd.replace(/'/g, `'\\''`)}' && ${command}` : command, controller.signal, onData)
+					: ops.exec(shellCommandPrefix ? `${shellCommandPrefix}\n${command}` : command, params.cwd ?? ctx.cwd, { onData, signal: controller.signal }),
 			);
 			return { content: [{ type: "text", text: `Started ${id}; log: ${log}. You will be notified when it exits.` }], details: { id, log } };
 		},
