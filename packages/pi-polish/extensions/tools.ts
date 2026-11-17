@@ -89,8 +89,9 @@ interface Group {
 	started: number;
 	ended?: number;
 	timer?: NodeJS.Timeout;
-	// Opened by a click, so it shows in full like ctrl+o does, but on its own
+	// Opened or folded by a click, overriding ctrl+o for this group until ctrl+o is toggled
 	open?: boolean;
+	openUnder?: boolean;
 }
 
 type Result = { content: Array<{ type: string; text?: string }>; details?: unknown };
@@ -618,7 +619,7 @@ export default function (pi: ExtensionAPI) {
 		// Live rows wait for tool_execution_start to place them; history rows without a group render alone
 		if (!group) return live || !ready ? empty() : undefined;
 		if (group.members[0].id !== toolCallId) return empty();
-		if (context.expanded || group.open) return clickable(group, tree(group, theme));
+		if (shown(group, context.expanded)) return clickable(group, tree(group, theme), context.expanded);
 
 		const running = group.members.some((m) => !m.done);
 		const failed = group.members.filter((m) => m.error).length;
@@ -638,18 +639,24 @@ export default function (pi: ExtensionAPI) {
 		const mark = failed ? theme.fg("error", `${MARK} `) : "  ";
 		// Always the summary, even for one call ("Ran 1 shell command"), like Claude Code; a click or ctrl+o shows each one
 		const text = summary(group, false);
-		return clickable(group, oneLine([mark + theme.fg("dim", text)], failNote));
+		return clickable(group, oneLine([mark + theme.fg("dim", text)], failNote), context.expanded);
 	};
 
+	/** Whether a group shows as a tree: ctrl+o's state, unless a click changed it since ctrl+o was last toggled. */
+	const shown = (group: Group, expanded?: boolean) => (group.open !== undefined && group.openUnder === Boolean(expanded) ? group.open : Boolean(expanded));
 	/** A row that opens or closes its group when clicked. */
-	const clickable = (group: Group, row: Component): Component =>
+	const clickable = (group: Group, row: Component, expanded?: boolean): Component =>
 		new MouseRegion(row, (event) => {
 			if (event.type !== "click" || event.button !== "left") return undefined;
-			group.open = !group.open;
+			group.open = !shown(group, expanded);
+			group.openUnder = Boolean(expanded);
 			refresh(group);
 			return { handled: true };
 		});
-	const isOpen = (context: { expanded?: boolean; toolCallId?: string }) => Boolean(context.expanded || groupOf.get(context.toolCallId ?? "")?.open);
+	const isOpen = (context: { expanded?: boolean; toolCallId?: string }) => {
+		const group = groupOf.get(context.toolCallId ?? "");
+		return group ? shown(group, context.expanded) : Boolean(context.expanded);
+	};
 
 	// The ● carries the status, like Claude Code: dim while arguments stream, accent while running, green or red when done.
 	// History rows redrawn after /reload have no execution state, so they count as done.
@@ -682,7 +689,7 @@ export default function (pi: ExtensionAPI) {
 			};
 			// A row of a group opened by a click closes it again
 			const group = groupOf.get(context.toolCallId);
-			return group?.open ? clickable(group, row) : row;
+			return group && shown(group, context.expanded) ? clickable(group, row, context.expanded) : row;
 		},
 		renderResult(result, { expanded }, theme, context) {
 			// A group's first row draws every call's output in its tree
