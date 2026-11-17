@@ -74,11 +74,14 @@ const VERBS: Record<Kind, [done: string, running: string, one: string, many: str
 interface Member {
 	id: string;
 	kind: Kind;
+	toolName: string;
+	args: any;
 	label: string;
 	done: boolean;
 	error: boolean;
 	// The latest output line of a running shell command
 	latest?: string;
+	result?: Result;
 }
 
 interface Group {
@@ -468,9 +471,9 @@ export default function (pi: ExtensionAPI) {
 		}
 	};
 
-	const assign = (id: string, toolName: string, args: unknown, done = false, error = false): Group => {
+	const assign = (id: string, toolName: string, args: unknown, done = false, error = false, result?: Result): Group => {
 		current ??= { members: [], started: Date.now() };
-		current.members.push({ id, kind: kindOf(toolName)!, label: label(toolName, args, cwd), done, error });
+		current.members.push({ id, kind: kindOf(toolName)!, toolName, args, label: label(toolName, args, cwd), done, error, result });
 		groupOf.set(id, current);
 		return current;
 	};
@@ -486,8 +489,8 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		reset();
 		const branch = ctx.sessionManager.getBranch();
-		// Tool results come after their calls, so collect the failures first
-		const failed = new Set(branch.flatMap((e: any) => (e.type === "message" && e.message.role === "toolResult" && e.message.isError ? [e.message.toolCallId] : [])));
+		// Tool results come after their calls, so collect them first
+		const results = new Map<string, any>(branch.flatMap((e: any) => (e.type === "message" && e.message.role === "toolResult" ? [[e.message.toolCallId, e.message]] : [])));
 		for (const entry of branch) {
 			if (entry.type !== "message") continue;
 			const msg = entry.message as any;
@@ -496,7 +499,8 @@ export default function (pi: ExtensionAPI) {
 			for (const part of msg.content ?? []) {
 				if (part.type === "text" && part.text.trim()) current = undefined;
 				if (part.type !== "toolCall") continue;
-				if (kindOf(part.name)) assign(part.id, part.name, part.arguments, true, failed.has(part.id));
+				const result = results.get(part.id);
+				if (kindOf(part.name)) assign(part.id, part.name, part.arguments, true, Boolean(result?.isError), result);
 				else current = undefined;
 			}
 		}
@@ -556,19 +560,65 @@ export default function (pi: ExtensionAPI) {
 		if (!group || !member) return;
 		member.done = true;
 		member.error = event.isError;
+		member.result = event.result;
 		tick(group);
 		refresh(group);
 	});
 	pi.on("session_shutdown", async () => reset());
 
-	/** Collapsed rendering for a grouped tool row; the group's first row draws the whole group. */
+	// Pi's own result view per tool, which MCP and codemode calls keep inside the expanded tree
+	const pisResult = new Map<string, ToolRenderers["renderResult"]>();
+
+	/** A call's command and output in the expanded tree, as lines that fit width. */
+	const memberLines = (m: Member, theme: any, width: number): string[] => {
+		const source = m.toolName === "bash" ? m.args?.command : m.toolName === "codemode" ? m.args?.code : undefined;
+		const command = source === undefined ? m.label : `${m.toolName === "bash" ? "$ " : ""}${String(source).trim()}`;
+		const commandLines = command.split("\n");
+		const shown = commandLines.slice(0, 60).join("\n") + (commandLines.length > 60 ? `\n... ${commandLines.length - 60} more lines` : "");
+		const lines = wrapTextWithAnsi(theme.fg("toolTitle", shown), width);
+		if (!m.result) return m.latest ? [...lines, ...wrapTextWithAnsi(theme.fg("dim", m.latest), width)] : lines;
+		const pis = pisResult.get(m.toolName);
+		if (pis) {
+			const context = { args: m.args, toolCallId: m.id, invalidate() {}, lastComponent: undefined, state: {}, cwd, executionStarted: true, argsComplete: true, isPartial: false, expanded: true, showImages: true, isError: m.error, outputPad: 0 };
+			const own = pis(m.result as any, { expanded: true, isPartial: false }, theme, context as any).render(width);
+			// Pi's view starts with a blank line that would leave an empty branch row
+			return [...lines, ...own.slice(own.findIndex((line) => visibleWidth(line.trim()) > 0))];
+		}
+		// Runs of blank lines, such as before a failed command's exit code, take one line
+		const output = resultText(m.result).trimEnd().replace(/\n{3,}/g, "\n\n").split("\n");
+		// All of it: the tool already cut long output, and expanding asks to see everything
+		return [...lines, ...output.flatMap((line) => wrapTextWithAnsi(theme.fg(m.error ? "error" : "toolOutput", line), width))];
+	};
+
+	/** The expanded group: its summary, then each call on a branch with its own dot, command and output. */
+	const tree = (group: Group, theme: any): Component => ({
+		invalidate() {},
+		render(width: number) {
+			const running = group.members.some((m) => !m.done);
+			const failed = group.members.filter((m) => m.error).length;
+			const elapsed = running ? theme.fg("dim", ` · ${Math.round((Date.now() - group.started) / 1000)}s`) : "";
+			const head = theme.fg(failed ? "error" : running ? "accent" : "success", `${MARK} `) + theme.fg("toolTitle", `${summary(group, running)}${running ? "…" : ""}`) + elapsed + (failed ? theme.fg("error", ` · ${failed} failed`) : "");
+			const lines = [truncateToWidth(head, width)];
+			group.members.forEach((m, i) => {
+				const last = i === group.members.length - 1;
+				const mark = theme.fg(m.error ? "error" : m.done ? "success" : "accent", `${MARK} `);
+				memberLines(m, theme, Math.max(10, width - 6)).forEach((line, j) => {
+					const branch = j === 0 ? (last ? "└ " : "├ ") : last ? "  " : "│ ";
+					lines.push(`  ${theme.fg("dim", branch)}${j === 0 ? mark : "  "}${line}`);
+				});
+			});
+			return lines;
+		},
+	});
+
+	/** Rendering for a grouped tool row; the group's first row draws the whole group, folded or as a tree. */
 	const renderGrouped = (toolCallId: string, theme: any, context: any): Component | undefined => {
 		rowInvalidate.set(toolCallId, context.invalidate);
 		const group = groupOf.get(toolCallId);
-		if (context.expanded || group?.open) return undefined;
 		// Live rows wait for tool_execution_start to place them; history rows without a group render alone
 		if (!group) return live || !ready ? empty() : undefined;
 		if (group.members[0].id !== toolCallId) return empty();
+		if (context.expanded || group.open) return clickable(group, tree(group, theme));
 
 		const running = group.members.some((m) => !m.done);
 		const failed = group.members.filter((m) => m.error).length;
@@ -635,7 +685,8 @@ export default function (pi: ExtensionAPI) {
 			return group?.open ? clickable(group, row) : row;
 		},
 		renderResult(result, { expanded }, theme, context) {
-			if (!expanded && !isOpen(context)) return empty();
+			// A group's first row draws every call's output in its tree
+			if (groupOf.has(context.toolCallId) || (!expanded && !isOpen(context))) return empty();
 			return new Text(expandedBody(theme, resultText(result as Result)), 0, 0);
 		},
 	});
@@ -718,10 +769,11 @@ export default function (pi: ExtensionAPI) {
 		// lists a script's nested calls. It gets no lastComponent, since that may be the empty component drawn
 		// while the row was collapsed.
 		const pis = next()?.renderResult;
+		if (pis) pisResult.set(toolName, pis);
 		return {
 			...own,
 			renderResult: (result, options, theme, context) =>
-				isOpen({ expanded: options.expanded, toolCallId: context.toolCallId }) && pis ? pis(result, { ...options, expanded: true }, theme, { ...context, lastComponent: undefined }) : own.renderResult!(result, options, theme, context),
+				!groupOf.has(context.toolCallId) && options.expanded && pis ? pis(result, { ...options, expanded: true }, theme, { ...context, lastComponent: undefined }) : own.renderResult!(result, options, theme, context),
 		};
 	});
 
