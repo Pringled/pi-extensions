@@ -170,6 +170,8 @@ export default function (pi: ExtensionAPI) {
 	// which for a long run left results hours late and woke Pi once per stale message when the run ended.
 	// triggerWakes counts those that ask for a turn, so a non-interactive run knows one is queued for it
 	let triggerWakes = 0;
+	// Jobs that have ended but not reported yet: the report waits for the log to close, so the exit wait must too
+	let ending = 0;
 	const wake = (content: string, details: { headline: string; last: string; error: boolean }, triggerTurn = true) => {
 		if (triggerTurn) triggerWakes++;
 		return pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "steer" });
@@ -383,7 +385,9 @@ export default function (pi: ExtensionAPI) {
 			.finally(() => {
 				job.ended = Date.now();
 				showJobs();
+				ending++;
 				out.end(() => {
+					ending--;
 					// A kill from session shutdown has no session left to notify
 					if (job.status === "killed" && !jobs.has(id)) return;
 					report(job, `Background job finished: ${summary(job)}\nLast lines:\n${tail(log, TAIL_LINES)}`, {
@@ -679,7 +683,7 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.mode !== "print" && ctx.mode !== "json") return;
 		const seen = triggerWakes;
 		const until = Date.now() + exitWaitMs();
-		while (running().some((job) => !job.watched) && triggerWakes === seen && Date.now() < until) {
+		while ((running().some((job) => !job.watched) || ending > 0) && triggerWakes === seen && Date.now() < until) {
 			await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
 		}
 	});
