@@ -28,8 +28,9 @@ const MAX_LISTED_FINISHED = 10;
 const HINT_AFTER_MS = 3000;
 // How long finished results wait for jobs started alongside them before Pi is woken anyway
 const GROUP_HOLD_MS = 2 * 60_000;
-// How long a non-interactive run waits for running jobs before it exits anyway, since a job that never ends, such as a server, must not hang it
-const SETTLE_WAIT_CAP_MS = 30 * 60_000;
+// Minutes a non-interactive run waits for running jobs before it exits anyway, unless settings.json sets "exitWait":
+// below the 1-hour limit some callers put on a run, so Pi still answers with what it has
+const EXIT_WAIT_MINUTES = 50;
 // How often that wait looks again, short enough to notice a finishing job straight away
 const SETTLE_POLL_MS = 250;
 
@@ -250,6 +251,12 @@ export default function (pi: ExtensionAPI) {
 	let viewing: Job | undefined;
 	// "full" (the default), "compact" without the output, or "off", set with "background": { "jobs": ... } in pi's settings.json
 	const jobsLine = () => (pi.getSettings() as { background?: { jobs?: string } }).background?.jobs ?? "full";
+	// Set with "background": { "exitWait": <minutes> }; 0 waits with no limit, for very long jobs, as opencode run does
+	const exitWaitMs = () => {
+		const minutes = (pi.getSettings() as { background?: { exitWait?: unknown } }).background?.exitWait;
+		if (typeof minutes !== "number" || minutes < 0) return EXIT_WAIT_MINUTES * 60_000;
+		return minutes === 0 ? Infinity : minutes * 60_000;
+	};
 	// The widget is set once per session and redrawn in place: setting it again would move it below the widgets other
 	// extensions added since, while running jobs belong at the top, next to what Pi is doing now
 	let redrawJobs = () => {};
@@ -671,7 +678,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("agent_before_settle", async (_event, ctx) => {
 		if (ctx.mode !== "print" && ctx.mode !== "json") return;
 		const seen = triggerWakes;
-		const until = Date.now() + SETTLE_WAIT_CAP_MS;
+		const until = Date.now() + exitWaitMs();
 		while (running().some((job) => !job.watched) && triggerWakes === seen && Date.now() < until) {
 			await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
 		}
