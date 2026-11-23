@@ -28,6 +28,10 @@ const MAX_LISTED_FINISHED = 10;
 const HINT_AFTER_MS = 3000;
 // How long finished results wait for jobs started alongside them before Pi is woken anyway
 const GROUP_HOLD_MS = 2 * 60_000;
+// Minutes a non-interactive run waits for running jobs before it exits anyway, unless settings.json sets "exitWait"
+const EXIT_WAIT_MINUTES = 30;
+// How often that wait looks again, short enough to notice a finishing job straight away
+const SETTLE_POLL_MS = 250;
 
 interface Job {
 	id: string;
@@ -162,9 +166,15 @@ export default function (pi: ExtensionAPI) {
 	let next = 1;
 
 	// While Pi is working, the message is steered in before its next step instead of following up after the whole run,
-	// which for a long run left results hours late and woke Pi once per stale message when the run ended
-	const wake = (content: string, details: { headline: string; last: string; error: boolean }, triggerTurn = true) =>
-		pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "steer" });
+	// which for a long run left results hours late and woke Pi once per stale message when the run ended.
+	// triggerWakes counts those that ask for a turn, so a non-interactive run knows one is queued for it
+	let triggerWakes = 0;
+	// Jobs that have ended but not reported yet: the report waits for the log to close, so the exit wait must too
+	let ending = 0;
+	const wake = (content: string, details: { headline: string; last: string; error: boolean }, triggerTurn = true) => {
+		if (triggerTurn) triggerWakes++;
+		return pi.sendMessage({ customType: "background-job", content, display: true, details }, { triggerTurn, deliverAs: "steer" });
+	};
 
 	// Jobs started in the same turn usually belong together, like several benchmarks to compare. While some of them
 	// still run, a successful one's result is added to the conversation without waking Pi, so it answers once at the
@@ -242,6 +252,12 @@ export default function (pi: ExtensionAPI) {
 	let viewing: Job | undefined;
 	// "full" (the default), "compact" without the output, or "off", set with "background": { "jobs": ... } in pi's settings.json
 	const jobsLine = () => (pi.getSettings() as { background?: { jobs?: string } }).background?.jobs ?? "full";
+	// Set with "background": { "exitWait": <minutes> }; 0 waits with no limit, for very long jobs, as opencode run does
+	const exitWaitMs = () => {
+		const minutes = (pi.getSettings() as { background?: { exitWait?: unknown } }).background?.exitWait;
+		if (typeof minutes !== "number" || minutes < 0) return EXIT_WAIT_MINUTES * 60_000;
+		return minutes === 0 ? Infinity : minutes * 60_000;
+	};
 	// The widget is set once per session and redrawn in place: setting it again would move it below the widgets other
 	// extensions added since, while running jobs belong at the top, next to what Pi is doing now
 	let redrawJobs = () => {};
@@ -368,7 +384,9 @@ export default function (pi: ExtensionAPI) {
 			.finally(() => {
 				job.ended = Date.now();
 				showJobs();
+				ending++;
 				out.end(() => {
+					ending--;
 					// A kill from session shutdown has no session left to notify
 					if (job.status === "killed" && !jobs.has(id)) return;
 					report(job, `Background job finished: ${summary(job)}\nLast lines:\n${tail(log, TAIL_LINES)}`, {
@@ -654,6 +672,18 @@ export default function (pi: ExtensionAPI) {
 			const msg = entry.type === "message" ? (entry.message as any) : undefined;
 			const n = Number(/^bg(\d+)$/.exec(msg?.role === "toolResult" && msg.toolName === "bg_run" ? String(msg.details?.id) : "")?.[1]);
 			if (n >= next) next = n + 1;
+		}
+	});
+
+	// pi -p and --mode json exit as soon as the agent settles, and session_shutdown stops the jobs with it, so wait for
+	// them here instead: a queued wake makes Pi continue and read the result. The TUI and rpc never wait: someone is chatting there
+	// Jobs started with wake_on, such as a dev server, may never end, so they never hold the exit
+	pi.on("agent_before_settle", async (_event, ctx) => {
+		if (ctx.mode !== "print" && ctx.mode !== "json") return;
+		const seen = triggerWakes;
+		const until = Date.now() + exitWaitMs();
+		while ((running().some((job) => !job.watched) || ending > 0) && triggerWakes === seen && Date.now() < until) {
+			await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS));
 		}
 	});
 

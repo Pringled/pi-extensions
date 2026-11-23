@@ -18,6 +18,7 @@ pi install npm:pi-background
 - `/bg` shows a job's last 20 lines of output, updating while it runs (`/bg bg2` for a specific job). Press esc to close it. Its list shows running jobs first, then the 10 latest finished ones.
 - Pi can wait for a specific line, such as a dev server's `listening on` or a training run's `epoch 3`, without checking again and again.
 - Jobs started together are reported together: when Pi starts several jobs at once, such as benchmarks to compare, it's woken once when the last one finishes instead of after each. You can keep chatting meanwhile, and a job that runs much longer doesn't hold the others back for more than 2 minutes.
+- In `pi -p` and `--mode json`, where Pi would exit as soon as it has answered, Pi waits for running jobs (up to 30 minutes, see [Settings](#settings)) and reads their results before it exits, instead of stopping them. Jobs waiting for a specific line, such as a dev server, never end on their own, so Pi doesn't wait for them.
 - A regular shell command still running after 2 minutes moves to the background on its own, so a slow command Pi didn't expect never holds up the turn. It shows in the jobs line, and Pi hears back when it ends. Press `ctrl+b` to move a running command to the background sooner. If another extension already replaces Pi's bash, such as a sandbox, pi-background leaves it alone and runs background jobs through it instead.
 
 You don't need to do anything differently: Pi decides when a job belongs in the background. You can also ask for it, for example "run the tests in the background and tell me when they're done".
@@ -31,6 +32,8 @@ The running jobs line has three levels. Set one in `~/.pi/agent/settings.json`, 
 | `full` (default) | `⏵ bg1 python3 train.py · 4m12s · epoch 3/10 loss 0.41` |
 | `compact` | `⏵ bg1 python3 train.py · 4m12s` |
 | `off` | Nothing |
+
+In `pi -p` and `--mode json`, Pi waits up to 30 minutes for running jobs before it exits. Change it in `~/.pi/agent/settings.json` with `"background": { "exitWait": 120 }` (in minutes), or set `0` for no limit, for very long jobs such as builds or training runs.
 
 ## Tools
 
