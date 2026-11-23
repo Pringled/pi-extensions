@@ -89,7 +89,7 @@ export default function (pi: ExtensionAPI) {
 
 			const render = editor.render.bind(editor);
 			editor.render = (width: number) => {
-				const lines = render(width);
+				const lines = [...render(width)];
 				// An empty editor's first line ends in plain spaces after the cursor; the suggestion goes there in grey
 				const blank = suggestion && editor.getText() === "" ? lines[1]?.match(/ {3,}$/)?.[0] : undefined;
 				if (blank) {
