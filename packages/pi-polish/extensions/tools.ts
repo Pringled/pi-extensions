@@ -361,6 +361,7 @@ function withBackground(line: string, spans: Span[], on: string, off: string): s
 class DiffView implements Component {
 	private highlighted: string[];
 	private palette: Palette;
+	private cachedRender?: { width: number; lines: string[] };
 
 	constructor(
 		private lines: string[],
@@ -403,6 +404,8 @@ class DiffView implements Component {
 	}
 
 	render(width: number): string[] {
+		if (this.cachedRender?.width === width) return this.cachedRender.lines;
+
 		const { addedBg, removedBg, addedGutter, removedGutter } = this.palette;
 		const out = this.lines.map((line, i) => {
 			const sign = line[0];
@@ -419,10 +422,13 @@ class DiffView implements Component {
 			return `${bg}${text.replace(/\x1b\[0?m/g, (m) => m + bg)}${pad}${BG_RESET}`;
 		});
 		if (this.footer) out.push(truncateToWidth(this.footer, width));
+		this.cachedRender = { width, lines: out };
 		return out;
 	}
 
-	invalidate(): void {}
+	invalidate(): void {
+		this.cachedRender = undefined;
+	}
 }
 
 function lineCount(n: number): string {
