@@ -28,9 +28,8 @@ const MAX_LISTED_FINISHED = 10;
 const HINT_AFTER_MS = 3000;
 // How long finished results wait for jobs started alongside them before Pi is woken anyway
 const GROUP_HOLD_MS = 2 * 60_000;
-// Minutes a non-interactive run waits for running jobs before it exits anyway, unless settings.json sets "exitWait":
-// below the 1-hour limit some callers put on a run, so Pi still answers with what it has
-const EXIT_WAIT_MINUTES = 50;
+// Minutes a non-interactive run waits for running jobs before it exits anyway, unless settings.json sets "exitWait"
+const EXIT_WAIT_MINUTES = 30;
 // How often that wait looks again, short enough to notice a finishing job straight away
 const SETTLE_POLL_MS = 250;
 
