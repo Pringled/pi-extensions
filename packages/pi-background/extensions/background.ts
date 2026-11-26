@@ -9,7 +9,7 @@ import {
 	type ExtensionContext,
 	type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { Key, matchesKey, stripTerminalSequences, truncateToWidth, type TuiMouseEvent, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { shortCommand } from "./command.ts";
 
@@ -276,31 +276,47 @@ export default function (pi: ExtensionAPI) {
 	const hinted = new Map<string, () => void>();
 	(globalThis as any)[Symbol.for("pi-background.movable")] = hinted;
 	let stopCtrlB = () => {};
-	const jobsWidget = (theme: any) => ({
-		invalidate() {},
-		render(width: number) {
-			if (jobsLine() === "off") return [];
-			const live = running().filter((job) => job !== viewing);
-			const silentFor = (job: Job) => Date.now() - (job.lastOutput ?? job.started);
-			let lines: string[];
-			if (live.length <= MAX_SHOWN_JOBS) {
-				lines = live.map((job) => {
-					const silent = silentFor(job);
-					const detail = silent >= SILENT_AFTER_MS ? ` · no output for ${duration(silent)}` : jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : "";
-					const text = theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${job.id} ${shownCommand(job.command)}`) + theme.fg("dim", ` · ${elapsed(job)}${detail}`);
-					return truncateToWidth(text, width);
-				});
-			} else {
-				// Past a few jobs, a line each crowds the input, so they share one with just the count, and a warning when
-				// some have gone quiet, since they may be stuck; /bg has the rest
-				const silent = live.filter((job) => silentFor(job) >= SILENT_AFTER_MS).length;
-				const warning = silent ? theme.fg("warning", ` · ${silent} silent for ${SILENT_AFTER_MS / 60_000}m+`) : "";
-				lines = [truncateToWidth(theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${live.length} jobs`) + warning, width)];
-			}
-			if (hinted.size > 0 && !(globalThis as any)[Symbol.for("pi-polish.showsMoveHint")]) lines.push(theme.fg("dim", "  ctrl+b to run in background"));
-			return lines;
-		},
-	});
+	const jobsWidget = (theme: any, ctx: ExtensionContext) => {
+		// Maps each rendered job row index to a job id (or "" for the collapsed summary line) so clicks open /bg
+		let rowTargets: string[] = [];
+		return {
+			invalidate() {},
+			handleMouse(event: TuiMouseEvent) {
+				if (event.type !== "click" || event.button !== "left" || viewerOpen) return undefined;
+				const target = rowTargets[event.y];
+				if (target === undefined) return undefined;
+				void showJob(target, ctx);
+				return { handled: true };
+			},
+			render(width: number) {
+				if (jobsLine() === "off") {
+					rowTargets = [];
+					return [];
+				}
+				const live = running().filter((job) => job !== viewing);
+				const silentFor = (job: Job) => Date.now() - (job.lastOutput ?? job.started);
+				let lines: string[];
+				if (live.length <= MAX_SHOWN_JOBS) {
+					rowTargets = live.map((job) => job.id);
+					lines = live.map((job) => {
+						const silent = silentFor(job);
+						const detail = silent >= SILENT_AFTER_MS ? ` · no output for ${duration(silent)}` : jobsLine() === "full" && job.lastLine ? ` · ${job.lastLine}` : "";
+						const text = theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${job.id} ${shownCommand(job.command)}`) + theme.fg("dim", ` · ${elapsed(job)}${detail}`);
+						return truncateToWidth(text, width);
+					});
+				} else {
+					// Past a few jobs, a line each crowds the input, so they share one with just the count, and a warning when
+					// some have gone quiet, since they may be stuck; /bg has the rest
+					rowTargets = [""];
+					const silent = live.filter((job) => silentFor(job) >= SILENT_AFTER_MS).length;
+					const warning = silent ? theme.fg("warning", ` · ${silent} silent for ${SILENT_AFTER_MS / 60_000}m+`) : "";
+					lines = [truncateToWidth(theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${live.length} jobs`) + warning, width)];
+				}
+				if (hinted.size > 0 && !(globalThis as any)[Symbol.for("pi-polish.showsMoveHint")]) lines.push(theme.fg("dim", "  ctrl+b to run in background"));
+				return lines;
+			},
+		};
+	};
 
 	const find = (id: string): Job => {
 		const job = jobs.get(id);
@@ -583,30 +599,32 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	let viewerOpen = false;
 	// Shows a job's latest output in place of the input until esc, refreshed every second while it runs
 	const showJob = async (args: string, ctx: ExtensionContext) => {
-		if (!ctx.hasUI) return;
+		if (!ctx.hasUI || viewerOpen) return;
 		const all = [...jobs.values()].reverse();
 		if (all.length === 0) return ctx.ui.notify("No background jobs yet", "info");
 		// "/bg 2" works as well as "/bg bg2"
 		const wanted = args.trim().toLowerCase().replace(/^(\d+)$/, "bg$1");
 		let job = wanted ? jobs.get(wanted) : all.length === 1 ? all[0] : undefined;
 		if (wanted && !job) return ctx.ui.notify(`No background job ${args.trim()}; there's ${[...jobs.keys()].join(", ")}`, "warning");
-		if (!job) {
-			// Running jobs first, then the latest finished ones
-			const listed = [...all.filter((other) => other.status === "running"), ...all.filter((other) => other.status !== "running").slice(0, MAX_LISTED_FINISHED)];
-			// Matched by position, since the elapsed time in a label changes while the list is open
-			// Ids and commands padded to one width, so the states and times line up
-			const idWidth = Math.max(...listed.map((other) => other.id.length));
-			const commandWidth = Math.max(...listed.map((other) => shownCommand(other.command).length));
-			const options = listed.map((other) => `${other.id.padEnd(idWidth)} ${shownCommand(other.command).padEnd(commandWidth)} · ${state(other)} · ${elapsed(other)}`);
-			job = listed[options.indexOf((await ctx.ui.select("Background jobs", options)) ?? "")];
-			if (!job) return;
-		}
-		const shown = job;
-		viewing = shown;
-		const log = shown.log.replace(homedir(), "~");
+		viewerOpen = true;
 		try {
+			if (!job) {
+				// Running jobs first, then the latest finished ones
+				const listed = [...all.filter((other) => other.status === "running"), ...all.filter((other) => other.status !== "running").slice(0, MAX_LISTED_FINISHED)];
+				// Matched by position, since the elapsed time in a label changes while the list is open
+				// Ids and commands padded to one width, so the states and times line up
+				const idWidth = Math.max(...listed.map((other) => other.id.length));
+				const commandWidth = Math.max(...listed.map((other) => shownCommand(other.command).length));
+				const options = listed.map((other) => `${other.id.padEnd(idWidth)} ${shownCommand(other.command).padEnd(commandWidth)} · ${state(other)} · ${elapsed(other)}`);
+				job = listed[options.indexOf((await ctx.ui.select("Background jobs", options)) ?? "")];
+				if (!job) return;
+			}
+			const shown = job;
+			viewing = shown;
+			const log = shown.log.replace(homedir(), "~");
 			await ctx.ui.custom<void>((tui, theme, _kb, done) => {
 				const timer = setInterval(() => tui.requestRender(), 1000);
 				return {
@@ -634,6 +652,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			});
 		} finally {
+			viewerOpen = false;
 			viewing = undefined;
 		}
 	};
@@ -658,7 +677,7 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.mode === "tui") {
 			ctx.ui.setWidget("background-jobs", (tui, theme) => {
 				redrawJobs = () => tui.requestRender();
-				return jobsWidget(theme);
+				return jobsWidget(theme, ctx);
 			});
 			// ctrl+b moves running bash commands to the background; otherwise it stays the editor's cursor-left
 			stopCtrlB();
