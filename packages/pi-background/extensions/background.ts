@@ -9,7 +9,7 @@ import {
 	type ExtensionContext,
 	type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey, stripTerminalSequences, truncateToWidth, type TuiMouseEvent, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { Key, type KeyId, matchesKey, stripTerminalSequences, truncateToWidth, type TuiMouseEvent, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { shortCommand } from "./command.ts";
 
@@ -258,6 +258,15 @@ export default function (pi: ExtensionAPI) {
 		if (typeof minutes !== "number" || minutes < 0) return EXIT_WAIT_MINUTES * 60_000;
 		return minutes === 0 ? Infinity : minutes * 60_000;
 	};
+	// Shortcut that moves a running bash command to the background, set with "background": { "key": ... } ("off" disables it)
+	const moveKey = (): KeyId | undefined => {
+		const raw = (pi.getSettings() as { background?: { key?: unknown } }).background?.key;
+		if (raw === false) return undefined;
+		if (typeof raw !== "string") return Key.ctrl("b");
+		const key = raw.trim().toLowerCase();
+		if (!key || key === "off") return undefined;
+		return key as KeyId;
+	};
 	// The widget is set once per session and redrawn in place: setting it again would move it below the widgets other
 	// extensions added since, while running jobs belong at the top, next to what Pi is doing now
 	let redrawJobs = () => {};
@@ -271,11 +280,11 @@ export default function (pi: ExtensionAPI) {
 		}
 		redrawJobs();
 	};
-	// Running bash commands that ctrl+b can move to the background now, by tool call id, once they have run for
+	// Running bash commands that the move shortcut can push to the background now, by tool call id, once they have run for
 	// HINT_AFTER_MS. Shared so pi-polish can show the hint under the command's row instead of in the jobs line.
 	const hinted = new Map<string, () => void>();
 	(globalThis as any)[Symbol.for("pi-background.movable")] = hinted;
-	let stopCtrlB = () => {};
+	let stopMoveKey = () => {};
 	const jobsWidget = (theme: any, ctx: ExtensionContext) => {
 		// Maps each rendered job row index to a job id (or "" for the collapsed summary line) so clicks open /bg
 		let rowTargets: string[] = [];
@@ -312,7 +321,8 @@ export default function (pi: ExtensionAPI) {
 					const warning = silent ? theme.fg("warning", ` · ${silent} silent for ${SILENT_AFTER_MS / 60_000}m+`) : "";
 					lines = [truncateToWidth(theme.fg("accent", "⏵ ") + theme.fg("toolTitle", `${live.length} jobs`) + warning, width)];
 				}
-				if (hinted.size > 0 && !(globalThis as any)[Symbol.for("pi-polish.showsMoveHint")]) lines.push(theme.fg("dim", "  ctrl+b to run in background"));
+				const key = moveKey();
+				if (key && hinted.size > 0 && !(globalThis as any)[Symbol.for("pi-polish.showsMoveHint")]) lines.push(theme.fg("dim", `  ${key} to run in background`));
 				return lines;
 			},
 		};
@@ -464,6 +474,7 @@ export default function (pi: ExtensionAPI) {
 				};
 				timer = setTimeout(move, after * 1000);
 				hint = setTimeout(() => {
+					if (!moveKey()) return;
 					hinted.set(toolCallId, move);
 					redrawJobs();
 				}, HINT_AFTER_MS);
@@ -685,10 +696,11 @@ export default function (pi: ExtensionAPI) {
 				redrawJobs = () => tui.requestRender();
 				return jobsWidget(theme, ctx);
 			});
-			// ctrl+b moves running bash commands to the background; otherwise it stays the editor's cursor-left
-			stopCtrlB();
-			stopCtrlB = ctx.ui.onTerminalInput((data) => {
-				if (hinted.size === 0 || !matchesKey(data, Key.ctrl("b"))) return undefined;
+			// The configured shortcut (ctrl+b by default) moves running bash commands to the background
+			stopMoveKey();
+			stopMoveKey = ctx.ui.onTerminalInput((data) => {
+				const key = moveKey();
+				if (!key || hinted.size === 0 || !matchesKey(data, key)) return undefined;
 				for (const move of [...hinted.values()]) move();
 				return { consume: true };
 			});
