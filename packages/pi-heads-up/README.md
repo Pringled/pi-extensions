@@ -19,11 +19,11 @@ When there's something worth knowing, a note shows above the input:
 ✦ heads-up: The rename removed spread() outright with no alias, so any code outside this folder that imports spread will break.
 ```
 
-Most of the time there's nothing to flag and no note appears. Quick questions don't get a second look, only tasks where Pi used a few tools. The note goes away when you send your next message.
+Quick questions don't get a second look, only tasks where Pi used a few tools. The note clears when you send your next message.
 
 ## How it works
 
-The second look comes from the same model, asked with the conversation exactly as Pi sends it and at the same thinking level, so it reuses Pi's prompt cache. It's told to leave out anything Pi's reply already says and anything minor.
+The second look reuses Pi's model and prompt cache, so it's quick and cheap. It's told to leave out anything Pi's reply already says and anything minor.
 
 ## License
 

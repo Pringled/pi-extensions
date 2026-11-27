@@ -13,15 +13,14 @@ pi install npm:pi-background
 
 ## Features
 
-- Long commands like downloads, builds, test suites and training runs go to the background, and Pi hears back with the exit code and the end of the output when they finish.
-- While a job runs, a line above the input shows it with its elapsed time and latest output, such as `⏵ bg1 python3 train.py · 4m12s · epoch 3/10 loss 0.41`. Click a job line in fullscreen mode to open its output directly, and click its title to close it again. A job that has printed nothing for 10 minutes shows `no output for 12m30s` instead, so a stuck one stands out. With more than three jobs running, they share one line, `⏵ 5 jobs`, which adds `1 silent for 10m+` when one may be stuck; click it or run `/bg` for the details.
-- `/bg` shows a job's last 20 lines of output, updating while it runs (`/bg bg2` for a specific job). Press esc to close it. Its list shows running jobs first, then the 10 latest finished ones.
-- Pi can wait for a specific line, such as a dev server's `listening on` or a training run's `epoch 3`, without checking again and again.
-- Jobs started together are reported together: when Pi starts several jobs at once, such as benchmarks to compare, it's woken once when the last one finishes instead of after each. You can keep chatting meanwhile, and a job that runs much longer doesn't hold the others back for more than 2 minutes.
-- In `pi -p` and `--mode json`, where Pi would exit as soon as it has answered, Pi waits for running jobs (up to 30 minutes, see [Settings](#settings)) and reads their results before it exits, instead of stopping them. Jobs waiting for a specific line, such as a dev server, never end on their own, so Pi doesn't wait for them.
-- A regular shell command still running after 2 minutes moves to the background on its own, so a slow command Pi didn't expect never holds up the turn. It shows in the jobs line, and Pi hears back when it ends. Press `ctrl+b` to move a running command to the background sooner. If another extension already replaces Pi's bash, such as a sandbox, pi-background leaves it alone and runs background jobs through it instead.
+- Long commands like downloads, builds, test suites and training runs run in the background, and Pi gets the exit code and the end of the output when they finish.
+- Running jobs show above the input, for example `⏵ bg1 python3 train.py · 4m12s · epoch 3/10 loss 0.41`. Click one or run `/bg` to see its live output. A job that has been silent for 10 minutes is flagged, so a stuck one stands out.
+- Pi can wait for a specific line, such as a dev server's `listening on`, without checking again and again.
+- Jobs started together are reported together, so Pi answers once when the last one finishes instead of after each.
+- A shell command still running after 2 minutes moves to the background by itself, so it never holds up the turn. `ctrl+b` moves one sooner.
+- In `pi -p` and `--mode json`, Pi waits for running jobs and reads their results before it exits.
 
-You don't need to do anything differently: Pi decides when a job belongs in the background. You can also ask for it, for example "run the tests in the background and tell me when they're done".
+Pi decides when a job belongs in the background, and you can also ask, for example "run the tests in the background and tell me when they're done".
 
 ## Settings
 
@@ -33,9 +32,9 @@ The running jobs line has three levels. Set one in `~/.pi/agent/settings.json`, 
 | `compact` | `⏵ bg1 python3 train.py · 4m12s` |
 | `off` | Nothing |
 
-In `pi -p` and `--mode json`, Pi waits up to 30 minutes for running jobs before it exits. Change it in `~/.pi/agent/settings.json` with `"background": { "exitWait": 120 }` (in minutes), or set `0` for no limit, for very long jobs such as builds or training runs.
+In `pi -p` and `--mode json`, Pi waits up to 30 minutes for running jobs. Change it with `"background": { "exitWait": 120 }` (in minutes), or `0` for no limit.
 
-The shortcut that moves a running bash command to the background defaults to `ctrl+b`. Change it in `~/.pi/agent/settings.json` with `"background": { "key": "alt+b" }` (for example when tmux uses `ctrl+b`), or set `"off"` to disable it.
+The shortcut that moves a running command to the background is `ctrl+b`. Change it with `"background": { "key": "alt+b" }` (for example when tmux uses `ctrl+b`), or `"off"` to disable it.
 
 ## Tools
 

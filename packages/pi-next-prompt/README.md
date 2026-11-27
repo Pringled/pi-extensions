@@ -20,7 +20,7 @@ There's no suggestion when Pi doesn't see an obvious next step, after an error, 
 
 ## How it works
 
-After each reply, the extension asks the same model for one short guess at your next message. The request starts with exactly what Pi just sent, at the same thinking level, so it reuses Pi's prompt cache.
+After each reply, Pi's model makes one short guess at your next message, reusing Pi's prompt cache so it's quick.
 
 ## License
 

@@ -16,8 +16,6 @@ pi install npm:pi-checkpoints
 - `/tree` and pick an earlier message: Pi asks whether to restore the files it changed since then. Pick a later message again, even on a branch you left, and they come back, so this works as both undo and redo.
 - `/fork` from an earlier message does the same before it starts the new session.
 
-The prompt lists the files it will restore, so you can say no and keep what you have.
-
 ## How it works
 
 Before Pi first edits or writes a file in a run, the file's content is saved, and again once the run is done. Each saved version is kept once under `~/.pi/agent/checkpoints`, and the session keeps track of which files each run changed. Undoing a new file also removes the folders Pi made for it, as long as they're empty.
@@ -33,7 +31,7 @@ Put these back to how they were at this point:
   test_stats.py
 ```
 
-Choose No to keep your files as they are. The conversation still moves to the point you picked.
+Choose No to keep your files as they are; the conversation still moves to the point you picked.
 
 ## License
 

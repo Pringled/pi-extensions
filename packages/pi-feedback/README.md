@@ -34,7 +34,7 @@ test_stats.py:L14
 Also test an even number of values
 ```
 
-If Pi is busy, the message waits until it's done. If you didn't leave any comments, nothing is sent. Closing or reloading the tab doesn't end it, and the view updates by itself when files change, so you can keep it open while Pi works.
+If Pi is busy, the message waits until it's done. Closing or reloading the tab doesn't end it, and the view updates by itself when files change, so you can keep it open while Pi works.
 
 - `/feedback dev` compares with another branch instead of the default one.
 - On `main` itself, `/feedback` shows your uncommitted changes.
