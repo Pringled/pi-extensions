@@ -633,6 +633,12 @@ export default function (pi: ExtensionAPI) {
 					handleInput: (data: string) => {
 						if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || data === "q") done();
 					},
+					// Clicking the title row closes it again, like a click opened it from the jobs line
+					handleMouse: (event: TuiMouseEvent) => {
+						if (event.type !== "click" || event.button !== "left" || event.y !== 1) return undefined;
+						done();
+						return { handled: true };
+					},
 					render(width: number) {
 						const color = shown.status === "running" ? "accent" : shown.status === "exited" && shown.exitCode === 0 ? "success" : "error";
 						const title = theme.fg(color, " ● ") + theme.fg("toolTitle", `${shown.id} ${shownCommand(shown.command)}`);
