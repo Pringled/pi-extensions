@@ -60,6 +60,13 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-checkpoints-light.gif" alt="pi-checkpoints demo">
 </picture>
 
+**pi-subagent**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-subagent-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-subagent-light.gif" alt="pi-subagent demo">
+</picture>
+
 **pi-feedback**
 
 <picture>

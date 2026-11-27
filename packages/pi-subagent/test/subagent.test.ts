@@ -3,13 +3,19 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { fauxAssistantMessage, startPi, until } from "../../../test/harness.mts";
+import { fauxAssistantMessage, plain, startPi, until } from "../../../test/harness.mts";
 
 const extensions = ["packages/pi-subagent/extensions/subagent.ts"];
 
-// Agents run the Pi that's running, which in tests is this stand-in: it answers with the arguments it got
+// Agents run the Pi that's running, which in tests is this stand-in: it reads a file, then answers with the arguments it got
 const fake = join(getAgentDir(), "fake-pi.mjs");
-writeFileSync(fake, "setTimeout(() => console.log(JSON.stringify(process.argv.slice(2))), 300);\n");
+writeFileSync(
+	fake,
+	`const say = (event) => console.log(JSON.stringify(event));
+say({ type: "tool_execution_start", toolName: "read", args: { path: "src/auth.ts" } });
+setTimeout(() => say({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: JSON.stringify(process.argv.slice(2)) }] } }), 400);
+`,
+);
 process.argv[1] = fake;
 mkdirSync(join(getAgentDir(), "agents"), { recursive: true });
 writeFileSync(join(getAgentDir(), "agents", "review.md"), "---\ndescription: Reviews the branch\nmodel: openai/gpt-5\n---\nReview $ARGUMENTS for bugs.\n");
@@ -24,6 +30,7 @@ for (const [line, label, prompt, model] of [
 		assert.match(pi.ui.widget("subagents")![0], new RegExp(`^⏵ ${label} · 0:0\\d$`));
 		const message: any = await until(() => pi.session.messages.find((m: any) => m.customType === "subagent"));
 		const args = JSON.parse(message.content.split("\n\n")[1]);
+		assert.equal(args[args.indexOf("--mode") + 1], "json");
 		assert.equal(args.at(-1), prompt);
 		assert.equal(args[args.indexOf("--model") + 1], model);
 		assert.match(message.content, new RegExp(`^Agent ${label} finished:[\\s\\S]*pi --session ${args[args.indexOf("--session-id") + 1]}\\)$`));
@@ -31,6 +38,21 @@ for (const [line, label, prompt, model] of [
 		await pi.dispose();
 	});
 }
+
+test("clicking an agent's line shows what it's doing, and clicking its title closes it again", async () => {
+	const pi = await startPi({ extensions });
+	await pi.command("/agent review");
+	const click = (component: any, y: number) => component.handleMouse({ type: "click", button: "left", x: 0, y });
+	await until(() => pi.ui.widget("subagents")!.length);
+	click(pi.ui.widgets.get("subagents"), 0);
+	const view = await until(() => pi.ui.open && plain(pi.ui.open.component.render(60)));
+	assert.match(view[1], /^ ● review +running · 0:0\d$/);
+	await until(() => plain(pi.ui.open!.component.render(60)).includes("   read src/auth.ts"));
+	click(pi.ui.open!.component, 1);
+	assert.equal(pi.ui.open, undefined);
+	await until(() => pi.session.messages.find((m: any) => m.customType === "subagent"));
+	await pi.dispose();
+});
 
 test("Pi only gets the agent tool in runs a command or prompt template started", async () => {
 	const offered: boolean[] = [];
