@@ -19,6 +19,7 @@ jobs:
           node-version: 22
       # pi provides these at runtime; the latest versions make the check catch pi API changes
       - run: npm install --no-save --no-package-lock typescript @types/node @earendil-works/pi-coding-agent @earendil-works/pi-ai @earendil-works/pi-tui typebox
-      - run: npm install --prefix packages/pi-polish --omit=peer --no-package-lock
+      - run: npm install --omit=peer --no-package-lock
+        working-directory: packages/pi-polish
       - run: npx tsc -p .
       - run: node --test "packages/*/test/*.test.ts"
