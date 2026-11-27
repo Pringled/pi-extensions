@@ -23,7 +23,7 @@ Quick questions don't get a second look, only tasks where Pi used a few tools. T
 
 ## How it works
 
-It uses the same model and conversation as Pi, so it reuses Pi's prompt cache. It's told to leave out anything Pi's reply already says and anything minor.
+The second look reuses Pi's model and prompt cache, so it's quick and cheap. It's told to leave out anything Pi's reply already says and anything minor.
 
 ## License
 

@@ -13,7 +13,7 @@ pi install npm:pi-custom-agents
 
 ## Usage
 
-An agent is a markdown file in `~/.pi/agent/agents/`. The file name is the agent's name, the body is its prompt, and the frontmatter can set a description and model:
+An agent is a markdown file in `~/.pi/agent/agents/`. The file name is the agent's name, the body is its prompt, and the frontmatter can set a description, model and context:
 
 ```markdown
 ---
@@ -39,7 +39,7 @@ Try the other approach we discussed and tell me how it compares. $ARGUMENTS
 
 Each running agent gets a line above the input; click it to see what the agent is doing, and click its title or press esc to close that again. When it's done, its report appears in the chat. Every agent's session is saved, so you can open it with `pi --session <id>` (the report says which) and carry on where it stopped.
 
-Prompt templates can hand work to agents too. In a run started by a command or prompt template, Pi gets an `agent` tool, so a template can say "use the agent tool with openai/gpt-5 to look for bugs, and another one with anthropic/claude-opus for code that could be simpler, then combine their reports". It waits for their reports instead of running them in the background, so a template can stop in between to ask you something.
+Prompt templates can use agents too: in a run started by a command or template, Pi gets an `agent` tool, for example "use the agent tool with openai/gpt-5 to look for bugs, then sum up its report". Pi waits for the report, so a template can stop and ask you something in between.
 
 ## License
 
