@@ -284,6 +284,7 @@ export default function (pi: ExtensionAPI) {
 	// HINT_AFTER_MS. Shared so pi-polish can show the hint under the command's row instead of in the jobs line.
 	const hinted = new Map<string, () => void>();
 	(globalThis as any)[Symbol.for("pi-background.movable")] = hinted;
+	(globalThis as any)[Symbol.for("pi-background.moveKey")] = moveKey;
 	let stopMoveKey = () => {};
 	const jobsWidget = (theme: any, ctx: ExtensionContext) => {
 		// Maps each rendered job row index to a job id (or "" for the collapsed summary line) so clicks open /bg

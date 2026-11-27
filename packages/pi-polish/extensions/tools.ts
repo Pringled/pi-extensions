@@ -637,8 +637,9 @@ export default function (pi: ExtensionAPI) {
 			const pulse = secs % 2 ? "dim" : "accent";
 			const head = theme.fg(pulse, `${MARK} `) + theme.fg("toolTitle", `${summary(group, true)}…`) + theme.fg("dim", ` · ${secs}s`) + failNote;
 			const latest = active.latest ? [theme.fg("dim", `    ${active.latest}`)] : [];
-			// pi-background marks commands that ctrl+b can move to the background
-			const movable = (globalThis as any)[Symbol.for("pi-background.movable")]?.has(active.id) ? [theme.fg("dim", "    (ctrl+b to run in background)")] : [];
+			// pi-background marks commands that its shortcut (ctrl+b unless set otherwise) can move to the background
+			const moveKey = (globalThis as any)[Symbol.for("pi-background.moveKey")]?.() ?? "ctrl+b";
+			const movable = (globalThis as any)[Symbol.for("pi-background.movable")]?.has(active.id) ? [theme.fg("dim", `    (${moveKey} to run in background)`)] : [];
 			return oneLine([head, theme.fg("dim", `  └ ${active.label}`), ...latest, ...movable]);
 		}
 		// Finished rows go quiet, like Claude Code's: dim text, with a red ● only when something failed
