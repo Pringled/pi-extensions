@@ -1,14 +1,14 @@
-# pi-subagent
+# pi-custom-agents
 
 A minimal way to write your own subagents for [Pi](https://pi.dev). An agent is a markdown file with a prompt and, if you like, a model. `/agent <name>` starts it in the background while you keep working, and you can click it to follow what it's doing. Agents only run when you start them: Pi doesn't spin them up on its own.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-subagent-dark.gif">
-  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-subagent-light.gif" alt="pi-subagent demo">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-custom-agents-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-custom-agents-light.gif" alt="pi-custom-agents demo">
 </picture>
 
 ```bash
-pi install npm:pi-subagent
+pi install npm:pi-custom-agents
 ```
 
 ## Usage

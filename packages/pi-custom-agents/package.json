@@ -1,10 +1,10 @@
 {
-  "name": "pi-subagent",
+  "name": "pi-custom-agents",
   "version": "0.1.0",
   "license": "MIT",
   "author": "Thomas van Dongen",
   "type": "module",
-  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-subagent#readme",
+  "homepage": "https://github.com/pringled/pi-extensions/tree/main/packages/pi-custom-agents#readme",
   "bugs": {
     "url": "https://github.com/pringled/pi-extensions/issues"
   },
@@ -25,11 +25,11 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pringled/pi-extensions.git",
-    "directory": "packages/pi-subagent"
+    "directory": "packages/pi-custom-agents"
   },
   "pi": {
     "extensions": [
-      "./extensions/subagent.ts"
+      "./extensions/custom-agents.ts"
     ]
   },
   "peerDependencies": {

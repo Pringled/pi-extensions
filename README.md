@@ -38,7 +38,7 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
 | Package | What it does | npm |
 | --- | --- | --- |
 | [`pi-background`](packages/pi-background) | Background jobs and a bash timeout, so Pi never blocks or hangs. | [![npm](https://img.shields.io/npm/v/pi-background)](https://www.npmjs.com/package/pi-background) |
-| [`pi-subagent`](packages/pi-subagent) | Write your own subagents as markdown files and run them in the background with `/agent`. | [![npm](https://img.shields.io/npm/v/pi-subagent)](https://www.npmjs.com/package/pi-subagent) |
+| [`pi-custom-agents`](packages/pi-custom-agents) | Write your own subagents as markdown files and run them in the background with `/agent`. | [![npm](https://img.shields.io/npm/v/pi-custom-agents)](https://www.npmjs.com/package/pi-custom-agents) |
 | [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files Pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
 | [`pi-feedback`](packages/pi-feedback) | Give Pi feedback on its changes: comment on lines in a GitHub-style browser view and send them back. | [![npm](https://img.shields.io/npm/v/pi-feedback)](https://www.npmjs.com/package/pi-feedback) |
 | [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
@@ -53,11 +53,11 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
   <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-background-light.gif" alt="pi-background demo">
 </picture>
 
-**pi-subagent**
+**pi-custom-agents**
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-subagent-dark.gif">
-  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-subagent-light.gif" alt="pi-subagent demo">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-custom-agents-dark.gif">
+  <img src="https://raw.githubusercontent.com/Pringled/pi-extensions/main/assets/images/pi-custom-agents-light.gif" alt="pi-custom-agents demo">
 </picture>
 
 **pi-checkpoints**
@@ -123,7 +123,7 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
 pi install npm:pi-polish
 pi install npm:pi-context-bar
 pi install npm:pi-background
-pi install npm:pi-subagent
+pi install npm:pi-custom-agents
 pi install npm:pi-checkpoints
 pi install npm:pi-feedback
 pi install npm:pi-model-pick

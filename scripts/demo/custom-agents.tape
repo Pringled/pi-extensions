@@ -1,4 +1,4 @@
-Output "assets/images/pi-subagent-dark.gif"
+Output "assets/images/pi-custom-agents-dark.gif"
 
 Source "scripts/demo/style-dark.tape"
 Set Height 760
