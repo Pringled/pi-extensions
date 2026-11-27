@@ -61,6 +61,10 @@ const prompted = (prompt: string) => {
 	return `agent "${text.length > 50 ? `${text.slice(0, 50)}…` : text}"`;
 };
 
+// How to start the Pi that's running: node with Pi's script, or Pi's standalone binary on its own, whose script
+// path is a virtual one inside the binary
+const self = /\$bunfs|~BUN|%7EBUN/.test(process.argv[1] ?? "") ? [] : [process.argv[1]];
+
 const elapsed = (run: Run) => {
 	const s = Math.round((Date.now() - run.started) / 1000);
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -143,7 +147,7 @@ export default function (pi: ExtensionAPI) {
 		changed();
 		try {
 			const args = ["--mode", "json", "--session-id", id, "--name", label, ...(model ? ["--model", model] : []), ...(fork ? ["--fork", fork] : []), prompt];
-			const child = spawn(process.execPath, [process.argv[1], ...args], { cwd: ctx.cwd, signal: entry.controller.signal, timeout: TIMEOUT_MS, stdio: ["ignore", "pipe", "pipe"] });
+			const child = spawn(process.execPath, [...self, ...args], { cwd: ctx.cwd, signal: entry.controller.signal, timeout: TIMEOUT_MS, stdio: ["ignore", "pipe", "pipe"] });
 			let report = "";
 			let error = "";
 			let stderr = "";
