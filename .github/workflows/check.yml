@@ -6,8 +6,13 @@ on:
     branches: [main]
 
 jobs:
-  typecheck:
-    runs-on: ubuntu-latest
+  check:
+    name: Typecheck and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,5 +20,9 @@ jobs:
           node-version: 22
       # pi provides these at runtime; the latest versions make the check catch pi API changes
       - run: npm install --no-save --no-package-lock typescript @types/node @earendil-works/pi-coding-agent @earendil-works/pi-ai @earendil-works/pi-tui typebox
-      - run: npm install --prefix packages/pi-polish --omit=peer --no-package-lock
-      - run: npx tsc -p .
+      - run: npm install --omit=peer --no-package-lock
+        working-directory: packages/pi-polish
+      - name: Typecheck
+        run: npx tsc -p .
+      - name: Test
+        run: node --test "packages/*/test/*.test.ts"
