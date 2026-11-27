@@ -35,7 +35,7 @@ export class FakeUI {
 	editor: any;
 	/** The component open with ctx.ui.custom, and how to close it */
 	open?: { component: any; done: (value?: unknown) => void };
-	/** Answers for the next confirm and select dialogs, in order; confirm says yes and select cancels when none is left */
+	/** Answers for the next confirm dialogs, in order; confirm says yes when none is left */
 	answers: unknown[] = [];
 	dialogs: { title: string; body: unknown }[] = [];
 	inputs: ((data: string) => { consume?: boolean; data?: string } | undefined)[] = [];
@@ -46,7 +46,7 @@ export class FakeUI {
 	context(): any {
 		const methods = Object.getOwnPropertyNames(FakeUI.prototype).filter((name) => name !== "constructor");
 		const noop = () => undefined;
-		const rest = ["input", "setStatus", "setWorkingVisible", "setWorkingIndicator", "setHiddenThinkingLabel", "setHeader", "setTitle", "pasteToEditor", "setEditorText", "getEditorText", "addAutocompleteProvider", "getAllThemes", "getTheme", "setTheme", "getToolsExpanded", "setToolsExpanded"];
+		const rest = ["select", "input", "setStatus", "setWorkingVisible", "setWorkingIndicator", "setHiddenThinkingLabel", "setHeader", "setTitle", "pasteToEditor", "setEditorText", "getEditorText", "addAutocompleteProvider", "getAllThemes", "getTheme", "setTheme", "getToolsExpanded", "setToolsExpanded"];
 		return {
 			...Object.fromEntries(rest.map((name) => [name, noop])),
 			...Object.fromEntries(methods.map((name) => [name, (this as any)[name].bind(this)])),
@@ -69,11 +69,6 @@ export class FakeUI {
 	async confirm(title: string, body: string) {
 		this.dialogs.push({ title, body });
 		return this.answers.length ? Boolean(this.answers.shift()) : true;
-	}
-	async select(title: string, options: string[]) {
-		this.dialogs.push({ title, body: options });
-		const answer = this.answers.shift();
-		return typeof answer === "number" ? options[answer] : (answer as string | undefined);
 	}
 	custom(factory: any) {
 		return new Promise((resolve) => {

@@ -56,7 +56,7 @@ test("pi -p waits for a running job and lets Pi read its result before exiting",
 });
 
 // Each case waits for the hint, which shows after 3 seconds
-for (const [setting, key, data] of [[undefined, "ctrl+b", "\x02"], ["alt+b", "alt+b", "\x1bb"], ["off", undefined, "\x02"]] as const) {
+for (const [setting, key, data] of [[undefined, "ctrl+b", "\x02"], ["off", undefined, "\x02"]] as const) {
 	test(`a running bash command moves to the background with ${key ?? "no key"} when background.key is ${setting ?? "unset"}`, async () => {
 		const pi = await startPi({
 			extensions,

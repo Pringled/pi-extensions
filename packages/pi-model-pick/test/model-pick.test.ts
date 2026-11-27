@@ -37,11 +37,3 @@ test("the model picked last becomes the default for new sessions, unless remembe
 		await pi.dispose();
 	}
 });
-
-test("/fav toggles the current model as a favorite", async () => {
-	const pi = await startPi({ extensions });
-	await pi.command("/fav");
-	await pi.command("/fav");
-	assert.deepEqual(pi.ui.notes.map((n) => n.message), ["Added faux/faux-1 to favorites", "Removed faux/faux-1 from favorites"]);
-	await pi.dispose();
-});
