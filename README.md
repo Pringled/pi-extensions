@@ -41,6 +41,7 @@ A set of extensions that make [Pi](https://pi.dev) nicer to use. They're minimal
 | [`pi-checkpoints`](packages/pi-checkpoints) | Rewind the files Pi edited along with the conversation. | [![npm](https://img.shields.io/npm/v/pi-checkpoints)](https://www.npmjs.com/package/pi-checkpoints) |
 | [`pi-feedback`](packages/pi-feedback) | Give Pi feedback on its changes: comment on lines in a GitHub-style browser view and send them back. | [![npm](https://img.shields.io/npm/v/pi-feedback)](https://www.npmjs.com/package/pi-feedback) |
 | [`pi-model-pick`](packages/pi-model-pick) | A model picker with favorite and recent models first. | [![npm](https://img.shields.io/npm/v/pi-model-pick)](https://www.npmjs.com/package/pi-model-pick) |
+| [`pi-subagent`](packages/pi-subagent) | Your own subagents as markdown files, run in the background with `/agent`. | [![npm](https://img.shields.io/npm/v/pi-subagent)](https://www.npmjs.com/package/pi-subagent) |
 
 <details>
 <summary>Demos</summary>
@@ -118,6 +119,7 @@ pi install npm:pi-background
 pi install npm:pi-checkpoints
 pi install npm:pi-feedback
 pi install npm:pi-model-pick
+pi install npm:pi-subagent
 pi install npm:pi-next-prompt
 pi install npm:pi-away
 pi install npm:pi-heads-up
