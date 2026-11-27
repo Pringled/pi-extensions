@@ -35,6 +35,8 @@ The running jobs line has three levels. Set one in `~/.pi/agent/settings.json`, 
 
 In `pi -p` and `--mode json`, Pi waits up to 30 minutes for running jobs before it exits. Change it in `~/.pi/agent/settings.json` with `"background": { "exitWait": 120 }` (in minutes), or set `0` for no limit, for very long jobs such as builds or training runs.
 
+The shortcut that moves a running bash command to the background defaults to `ctrl+b`. Change it in `~/.pi/agent/settings.json` with `"background": { "key": "alt+b" }` (for example when tmux uses `ctrl+b`), or set `"off"` to disable it.
+
 ## Tools
 
 Pi gets three tools for this: `bg_run` starts a job, `bg_status` shows how it's doing and its latest output, and `bg_kill` stops it. Jobs run with the same environment and sandbox as Pi's own shell commands, and stop when you close Pi.
