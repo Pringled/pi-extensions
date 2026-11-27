@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { fauxAssistantMessage, plain, startPi, theme, until } from "../../../test/harness.mts";
 
-const extensions = ["packages/pi-subagent/extensions/subagent.ts"];
+const extensions = ["packages/pi-custom-agents/extensions/custom-agents.ts"];
 
 // Agents run the Pi that's running, which in tests is this stand-in: it reads a file, then answers with the arguments it got
 const fake = join(getAgentDir(), "fake-pi.mjs");
