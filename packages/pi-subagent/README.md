@@ -27,7 +27,15 @@ Review this branch against main for bugs. $ARGUMENTS
 - `/agent <prompt>` runs any other prompt the same way, with the model you're on.
 - `/agent` on its own lists your agents.
 
-An agent starts without this conversation (it has your settings, extensions and skills, but not what you and Pi said), so its prompt has to say everything it needs.
+By default, an agent starts without any context. For an agent that should have the conversation's context, add `context: fork` to its frontmatter:
+
+```markdown
+---
+description: Try the other approach we discussed
+context: fork
+---
+Try the other approach we discussed and tell me how it compares. $ARGUMENTS
+```
 
 Each running agent gets a line above the input; click it to see what the agent is doing, and click its title or press esc to close that again. Its report lands in the chat when it's done. Every agent's session is saved, so you can open it with `pi --session <id>` (the report says which) and carry on where it stopped.
 

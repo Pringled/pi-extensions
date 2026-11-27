@@ -18,6 +18,7 @@ setTimeout(() => say({ type: "message_end", message: { role: "assistant", conten
 );
 process.argv[1] = fake;
 mkdirSync(join(getAgentDir(), "agents"), { recursive: true });
+writeFileSync(join(getAgentDir(), "agents", "explore.md"), "---\ncontext: fork\n---\nTry the other approach.\n");
 writeFileSync(join(getAgentDir(), "agents", "review.md"), "---\ndescription: Reviews the branch\nmodel: openai/gpt-5\n---\nReview $ARGUMENTS for bugs.\n");
 
 for (const [line, label, prompt, model] of [
@@ -42,6 +43,18 @@ for (const [line, label, prompt, model] of [
 		await pi.dispose();
 	});
 }
+
+test("an agent with context: fork starts from a copy of this conversation, which has to be saved", async () => {
+	const pi = await startPi({ extensions });
+	await pi.command("/agent explore");
+	assert.deepEqual(pi.ui.notes.at(-1), { message: "agent explore starts from this conversation, which isn't saved", type: "warning" });
+	(pi.session.sessionManager as any).getSessionFile = () => "/saved/session.jsonl";
+	await pi.command("/agent explore");
+	const message: any = await until(() => pi.session.messages.find((m: any) => m.customType === "subagent"));
+	const args = JSON.parse(message.details.text);
+	assert.equal(args[args.indexOf("--fork") + 1], "/saved/session.jsonl");
+	await pi.dispose();
+});
 
 test("clicking an agent's line shows what it's doing, and clicking its title closes it again", async () => {
 	const pi = await startPi({ extensions });

@@ -12,6 +12,8 @@ interface Agent {
 	name: string;
 	description?: string;
 	model?: string;
+	/** "fork" starts the agent from a copy of this conversation instead of from scratch */
+	context?: string;
 	prompt: string;
 }
 
@@ -35,8 +37,8 @@ function agents(): Agent[] {
 		return [];
 	}
 	return files.map((file) => {
-		const { frontmatter, body } = parseFrontmatter<{ description?: string; model?: string }>(readFileSync(join(dir, file), "utf8"));
-		return { name: basename(file, ".md"), description: frontmatter.description, model: frontmatter.model, prompt: body.trim() };
+		const { frontmatter, body } = parseFrontmatter<{ description?: string; model?: string; context?: string }>(readFileSync(join(dir, file), "utf8"));
+		return { name: basename(file, ".md"), description: frontmatter.description, model: frontmatter.model, context: frontmatter.context, prompt: body.trim() };
 	});
 }
 
@@ -133,14 +135,14 @@ export default function (pi: ExtensionAPI) {
 
 	// A fresh Pi, the same one that's running, without this conversation. Its session is saved, so you can open it
 	// afterwards and carry on there. Its JSON events show what it's doing meanwhile, and its last reply is the report
-	async function run(ctx: ExtensionContext, label: string, prompt: string, model: string | undefined, signal?: AbortSignal) {
+	async function run(ctx: ExtensionContext, label: string, prompt: string, model: string | undefined, signal?: AbortSignal, fork?: string) {
 		const id = randomUUID();
 		const entry: Run = { label, started: Date.now(), controller: new AbortController(), activity: [] };
 		signal?.addEventListener("abort", () => entry.controller.abort());
 		runs.add(entry);
 		changed();
 		try {
-			const args = ["--mode", "json", "--session-id", id, "--name", label, ...(model ? ["--model", model] : []), prompt];
+			const args = ["--mode", "json", "--session-id", id, "--name", label, ...(model ? ["--model", model] : []), ...(fork ? ["--fork", fork] : []), prompt];
 			const child = spawn(process.execPath, [process.argv[1], ...args], { cwd: ctx.cwd, signal: entry.controller.signal, timeout: TIMEOUT_MS, stdio: ["ignore", "pipe", "pipe"] });
 			let report = "";
 			let error = "";
@@ -207,7 +209,9 @@ export default function (pi: ExtensionAPI) {
 			const current = ctx.model && `${ctx.model.provider}/${ctx.model.id}`;
 			const label = agent ? named(args) : prompted(args);
 			const prompt = agent ? fill(agent.prompt, rest.join(" ")) : args.trim();
-			void run(ctx, label, prompt, agent?.model ?? current).then(({ id, text, failed, time }) =>
+			const fork = agent?.context === "fork" ? ctx.sessionManager.getSessionFile() : undefined;
+			if (agent?.context === "fork" && !fork) return ctx.ui.notify(`${label} starts from this conversation, which isn't saved`, "warning");
+			void run(ctx, label, prompt, agent?.model ?? current, undefined, fork).then(({ id, text, failed, time }) =>
 				pi.sendMessage(
 					{
 						customType: "subagent",
