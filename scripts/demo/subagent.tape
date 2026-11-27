@@ -17,15 +17,14 @@ Tab
 Sleep 400ms
 Enter
 # The agent runs in the background; clicking its line shows what it's doing, and clicking the title closes it
-Wait+Screen@20s /⏵ review/
-Sleep 1500ms
+Wait+Screen@20s /⏵ agent review/
+Sleep 2500ms
 Ctrl+G
-Type "⏵ review"
+Type "⏵ agent review"
 Ctrl+G
-Wait+Screen@30s /\$ python/
-Sleep 2s
+Sleep 3500ms
 Ctrl+G
-Type "● review"
+Type "● agent review"
 Ctrl+G
-Wait+Screen@120s /Agent review finished/
+Wait+Screen@120s /agent review · done/
 Sleep 8s

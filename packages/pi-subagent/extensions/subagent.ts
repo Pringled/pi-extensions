@@ -2,8 +2,8 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { type ExtensionAPI, type ExtensionContext, getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
-import { Key, matchesKey, type TuiMouseEvent, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { type ExtensionAPI, type ExtensionContext, getAgentDir, getMarkdownTheme, parseFrontmatter } from "@earendil-works/pi-coding-agent";
+import { Key, Markdown, matchesKey, type TuiMouseEvent, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const TIMEOUT_MS = 60 * 60_000;
@@ -49,6 +49,14 @@ const call = (name: string, args: any) => {
 	const main = args?.command ?? args?.path ?? args?.pattern ?? args?.query ?? args?.url;
 	const text = (typeof main === "string" ? main : JSON.stringify(args ?? {})).replace(/\s+/g, " ");
 	return name === "bash" ? `$ ${text}` : `${name} ${text}`;
+};
+
+// How an agent shows in the jobs line and its report: agent review, or agent "the prompt…" for one without a file
+const oneLine = (text: string) => text.trim().replace(/\s+/g, " ");
+const named = (args: string) => `agent ${oneLine(args)}`;
+const prompted = (prompt: string) => {
+	const text = oneLine(prompt);
+	return `agent "${text.length > 50 ? `${text.slice(0, 50)}…` : text}"`;
 };
 
 const elapsed = (run: Run) => {
@@ -132,7 +140,7 @@ export default function (pi: ExtensionAPI) {
 		runs.add(entry);
 		changed();
 		try {
-			const args = ["--mode", "json", "--session-id", id, "--name", `agent: ${label}`, ...(model ? ["--model", model] : []), prompt];
+			const args = ["--mode", "json", "--session-id", id, "--name", label, ...(model ? ["--model", model] : []), prompt];
 			const child = spawn(process.execPath, [process.argv[1], ...args], { cwd: ctx.cwd, signal: entry.controller.signal, timeout: TIMEOUT_MS, stdio: ["ignore", "pipe", "pipe"] });
 			let report = "";
 			let error = "";
@@ -159,17 +167,29 @@ export default function (pi: ExtensionAPI) {
 			});
 			child.stderr.setEncoding("utf8").on("data", (chunk: string) => (stderr += chunk));
 			const code = await new Promise<number | null>((resolve) => child.on("close", resolve).on("error", () => resolve(null)));
-			const text =
-				code === 0 && report && !error
-					? report
-					: `The agent failed (exit ${code}${entry.controller.signal.aborted ? ", stopped" : ""}): ${(error || stderr || report).trim().slice(-800)}`;
-			return { id, text };
+			const failed = code !== 0 || !report || !!error;
+			const text = failed ? `The agent failed (exit ${code}${entry.controller.signal.aborted ? ", stopped" : ""}): ${(error || stderr || report).trim().slice(-800)}` : report;
+			return { id, text, failed, time: elapsed(entry) };
 		} finally {
 			runs.delete(entry);
 			entry.close?.();
 			changed();
 		}
 	}
+
+	// A report as a row like pi-polish's tool rows, with the text under it as markdown
+	pi.registerMessageRenderer("subagent", (message, _options, theme) => {
+		const d = message.details as { id: string; label: string; text: string; failed: boolean; time: string };
+		const text = new Markdown(d.text, 0, 0, getMarkdownTheme());
+		return {
+			invalidate() {},
+			render: (width: number) => [
+				truncateToWidth(theme.fg(d.failed ? "error" : "success", "● ") + theme.fg("toolTitle", d.label) + theme.fg("dim", ` · ${d.failed ? "failed" : "done"} in ${d.time}`), width),
+				...text.render(Math.max(10, width - 4)).map((line, i) => (i === 0 ? theme.fg("dim", "  └ ") : "    ") + line),
+				theme.fg("dim", `    pi --session ${d.id}`),
+			],
+		};
+	});
 
 	pi.registerCommand("agent", {
 		description: "Run an agent from ~/.pi/agent/agents, or any prompt, in the background: /agent <name> [arguments] or /agent <prompt>",
@@ -185,11 +205,16 @@ export default function (pi: ExtensionAPI) {
 			}
 			const agent = agents().find((agent) => agent.name === first);
 			const current = ctx.model && `${ctx.model.provider}/${ctx.model.id}`;
-			const label = agent ? args.trim() : args.trim().replace(/\s+/g, " ").slice(0, 60);
+			const label = agent ? named(args) : prompted(args);
 			const prompt = agent ? fill(agent.prompt, rest.join(" ")) : args.trim();
-			void run(ctx, label, prompt, agent?.model ?? current).then(({ id, text }) =>
+			void run(ctx, label, prompt, agent?.model ?? current).then(({ id, text, failed, time }) =>
 				pi.sendMessage(
-					{ customType: "subagent", display: true, content: `Agent ${label} finished:\n\n${text}\n\n(open its session with pi --session ${id})`, details: { id } },
+					{
+						customType: "subagent",
+						display: true,
+						content: `${label} ${failed ? "failed" : "finished"}:\n\n${text}\n\n(open its session with pi --session ${id})`,
+						details: { id, label, text, failed, time },
+					},
 					{ deliverAs: "steer" },
 				),
 			);
@@ -227,7 +252,7 @@ export default function (pi: ExtensionAPI) {
 			model: Type.Optional(Type.String({ description: "provider/model, with an optional :thinking level; defaults to Pi's default model" })),
 		}),
 		async execute(_id, params, signal, _onUpdate, ctx) {
-			const { id, text } = await run(ctx, params.prompt.replace(/\s+/g, " ").slice(0, 60), params.prompt, params.model, signal);
+			const { id, text } = await run(ctx, prompted(params.prompt), params.prompt, params.model, signal);
 			return { content: [{ type: "text", text: `${text}\n\n(session: pi --session ${id})` }], details: { id } };
 		},
 	});

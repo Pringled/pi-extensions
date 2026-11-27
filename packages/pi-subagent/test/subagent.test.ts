@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { fauxAssistantMessage, plain, startPi, until } from "../../../test/harness.mts";
+import { fauxAssistantMessage, plain, startPi, theme, until } from "../../../test/harness.mts";
 
 const extensions = ["packages/pi-subagent/extensions/subagent.ts"];
 
@@ -21,8 +21,8 @@ mkdirSync(join(getAgentDir(), "agents"), { recursive: true });
 writeFileSync(join(getAgentDir(), "agents", "review.md"), "---\ndescription: Reviews the branch\nmodel: openai/gpt-5\n---\nReview $ARGUMENTS for bugs.\n");
 
 for (const [line, label, prompt, model] of [
-	["/agent review the auth code", "review the auth code", "Review the auth code for bugs.", "openai/gpt-5"],
-	["/agent  fix   the tests", "fix the tests", "fix   the tests", "faux/faux-1"],
+	["/agent review the auth code", "agent review the auth code", "Review the auth code for bugs.", "openai/gpt-5"],
+	["/agent  fix   the tests", 'agent "fix the tests"', "fix   the tests", "faux/faux-1"],
 ]) {
 	test(`${line} runs in the background and its report comes back`, async () => {
 		const pi = await startPi({ extensions });
@@ -33,7 +33,11 @@ for (const [line, label, prompt, model] of [
 		assert.equal(args[args.indexOf("--mode") + 1], "json");
 		assert.equal(args.at(-1), prompt);
 		assert.equal(args[args.indexOf("--model") + 1], model);
-		assert.match(message.content, new RegExp(`^Agent ${label} finished:[\\s\\S]*pi --session ${args[args.indexOf("--session-id") + 1]}\\)$`));
+		const id = args[args.indexOf("--session-id") + 1];
+		assert.match(message.content, new RegExp(`^${label} finished:[\\s\\S]*pi --session ${id}\\)$`));
+		const shown = plain(pi.runner.getMessageRenderer("subagent")!(message, { expanded: false } as any, theme)!.render(100));
+		assert.match(shown[0], new RegExp(`^● ${label} · done in 0:0\\d$`));
+		assert.equal(shown.at(-1), `    pi --session ${id}`);
 		assert.deepEqual(pi.ui.widget("subagents"), []);
 		await pi.dispose();
 	});
@@ -46,7 +50,7 @@ test("clicking an agent's line shows what it's doing, and clicking its title clo
 	await until(() => pi.ui.widget("subagents")!.length);
 	click(pi.ui.widgets.get("subagents"), 0);
 	const view = await until(() => pi.ui.open && plain(pi.ui.open.component.render(60)));
-	assert.match(view[1], /^ ● review +running · 0:0\d$/);
+	assert.match(view[1], /^ ● agent review +running · 0:0\d$/);
 	await until(() => plain(pi.ui.open!.component.render(60)).includes("   read src/auth.ts"));
 	click(pi.ui.open!.component, 1);
 	assert.equal(pi.ui.open, undefined);
