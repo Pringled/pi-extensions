@@ -56,6 +56,18 @@ test("an agent with context: fork starts from a copy of this conversation, which
 	await pi.dispose();
 });
 
+test("an agent file with broken frontmatter says what's wrong without breaking the other agents", async () => {
+	writeFileSync(join(getAgentDir(), "agents", "broken.md"), "---\ndescription: Shrink it: fast\n---\nShrink it.\n");
+	const pi = await startPi({ extensions });
+	const completions = await pi.runner.getCommand("agent")!.getArgumentCompletions!("");
+	assert.deepEqual(completions!.map((item) => item.value).sort(), ["broken", "explore", "review"]);
+	await pi.command("/agent broken");
+	assert.match(pi.ui.notes.at(-1)!.message, /^broken\.md can't be read: /);
+	assert.equal(pi.ui.notes.at(-1)!.type, "error");
+	assert.deepEqual(pi.ui.widget("subagents"), []);
+	await pi.dispose();
+});
+
 test("clicking an agent's line shows what it's doing, and clicking its title closes it again", async () => {
 	const pi = await startPi({ extensions });
 	await pi.command("/agent review");
