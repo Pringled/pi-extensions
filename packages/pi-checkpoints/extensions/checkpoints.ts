@@ -106,7 +106,6 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("agent_end", async () => {
-		if (before.size === 0) return;
 		const touched = before;
 		before = new Map();
 		const files: Checkpoint["files"] = [];

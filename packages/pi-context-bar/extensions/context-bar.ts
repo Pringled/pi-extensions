@@ -1,4 +1,3 @@
-import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
@@ -27,8 +26,7 @@ export default function (pi: ExtensionAPI) {
 					let cost = 0;
 					for (const e of ctx.sessionManager.getBranch()) {
 						if (e.type === "message" && e.message.role === "assistant") {
-							const m = e.message as AssistantMessage;
-							cost += m.usage.cost.total;
+							cost += e.message.usage.cost.total;
 						}
 					}
 

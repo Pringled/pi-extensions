@@ -61,8 +61,6 @@ export default function (pi: ExtensionAPI) {
 			return text.replace(/`/g, "").replace(/\s+/g, " ").trim() || undefined;
 		} catch {
 			return;
-		} finally {
-			if (pending === controller) pending = undefined;
 		}
 	}
 

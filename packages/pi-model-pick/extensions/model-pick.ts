@@ -136,7 +136,7 @@ export default function (pi: ExtensionAPI) {
 		rebuild();
 
 		let redraw = () => {};
-		const result = await ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
+		const result = await ctx.ui.custom<Model<Api> | null>((tui, theme, _kb, done) => {
 			redraw = () => tui.requestRender();
 			const searchInput = new Input();
 			searchInput.focused = true;
@@ -215,7 +215,7 @@ export default function (pi: ExtensionAPI) {
 					}
 					if (kb.matches(data, "tui.select.confirm")) {
 						const m = rows.find((r) => r.model && key(r.model) === selectedKey)?.model;
-						done(m ? key(m) : null);
+						done(m ?? null);
 						return;
 					}
 					if (kb.matches(data, "tui.select.cancel")) {
@@ -234,19 +234,11 @@ export default function (pi: ExtensionAPI) {
 
 		if (!result) return;
 
-		const [provider, ...idParts] = result.split("/");
-		const id = idParts.join("/");
-		const model = ctx.modelRegistry.find(provider, id);
-		if (!model) {
-			ctx.ui.notify(`Model ${result} not found`, "error");
-			return;
-		}
-
-		const success = await pi.setModel(model);
+		const success = await pi.setModel(result);
 		// The footer shows the model but only redraws on the next render
 		redraw();
 		if (!success) {
-			ctx.ui.notify(`No API key configured for ${result}`, "error");
+			ctx.ui.notify(`No API key configured for ${key(result)}`, "error");
 		}
 	}
 
