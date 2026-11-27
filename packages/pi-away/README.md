@@ -24,7 +24,7 @@ Short sessions, under three messages, don't get an automatic recap.
 
 ## How it works
 
-The recap comes from the same model, asked with the conversation exactly as Pi sends it and at the same thinking level, so it reuses Pi's prompt cache. The automatic recap is written three minutes after Pi finishes because the cache lasts about five.
+It uses the same model and conversation as Pi, so it reuses Pi's prompt cache. That cache lasts about five minutes, which is why the automatic recap comes after three.
 
 ## License
 
