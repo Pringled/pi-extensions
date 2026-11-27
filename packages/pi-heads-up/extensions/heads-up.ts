@@ -72,8 +72,6 @@ export default function (pi: ExtensionAPI) {
 				if (note && !/^none\.?$/i.test(note)) show(ctx, note);
 			} catch {
 				// The note is optional, so failures stay quiet
-			} finally {
-				if (pending === controller) pending = undefined;
 			}
 		})();
 	});

@@ -335,9 +335,8 @@ export default function (pi: ExtensionAPI) {
 		return job;
 	};
 
-	// Compact, Claude-Code-style rows instead of pi's default boxed tool and message rendering: quiet grey once done,
-	// with a dot only while running or when something failed
-	// "  └ text" in dim, with long and extra lines wrapped under the text instead of at the left edge
+	// Compact, Claude-Code-style rows instead of pi's default boxes: quiet grey once done, with a dot only while running
+	// or failed. A branch is "  └ text" in dim, with long and extra lines wrapped under the text instead of at the left edge
 	const branch = (theme: any, text: string, head?: string) => ({
 		invalidate() {},
 		render: (width: number) => [
@@ -690,14 +689,12 @@ export default function (pi: ExtensionAPI) {
 		return { action: "handled" };
 	});
 
-	// After /reload or a resume, carry on after the ids already in the conversation so "bg3" keeps meaning one job
 	pi.on("session_start", async (_event, ctx) => {
 		if (ctx.mode === "tui") {
 			ctx.ui.setWidget("background-jobs", (tui, theme) => {
 				redrawJobs = () => tui.requestRender();
 				return jobsWidget(theme, ctx);
 			});
-			// The configured shortcut (ctrl+b by default) moves running bash commands to the background
 			stopMoveKey();
 			stopMoveKey = ctx.ui.onTerminalInput((data) => {
 				const key = moveKey();
@@ -706,6 +703,7 @@ export default function (pi: ExtensionAPI) {
 				return { consume: true };
 			});
 		}
+		// After /reload or a resume, carry on after the ids already in the conversation so "bg3" keeps meaning one job
 		for (const entry of ctx.sessionManager.getBranch()) {
 			const msg = entry.type === "message" ? (entry.message as any) : undefined;
 			const n = Number(/^bg(\d+)$/.exec(msg?.role === "toolResult" && msg.toolName === "bg_run" ? String(msg.details?.id) : "")?.[1]);

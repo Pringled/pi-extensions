@@ -87,7 +87,6 @@ interface Member {
 interface Group {
 	members: Member[];
 	started: number;
-	ended?: number;
 	timer?: NodeJS.Timeout;
 	// Opened or folded by a click, overriding ctrl+o for this group until ctrl+o is toggled
 	open?: boolean;
@@ -148,10 +147,14 @@ function summary(group: Group, running: boolean): string {
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function expandedBody(theme: any, text: string, maxLines = 60): string {
-	const lines = text.split("\n");
-	const shown = lines.slice(0, maxLines).join("\n");
-	const extra = lines.length > maxLines ? `\n${theme.fg("dim", `... ${lines.length - maxLines} more lines`)}` : "";
+/** The first 60 lines, plus a "... N more lines" note when there are more. */
+function clip(lines: string[]): [shown: string, more: string] {
+	return [lines.slice(0, 60).join("\n"), lines.length > 60 ? `... ${lines.length - 60} more lines` : ""];
+}
+
+function expandedBody(theme: any, text: string): string {
+	const [shown, more] = clip(text.split("\n"));
+	const extra = more ? `\n${theme.fg("dim", more)}` : "";
 	return "  " + theme.fg("toolOutput", shown).replace(/\n/g, "\n  ") + extra;
 }
 
@@ -372,14 +375,9 @@ class DiffView implements Component {
 		const palette = (this.palette = paletteFor(theme));
 		// Highlight all bodies as one snippet so multi-line strings and docstrings color correctly
 		const bodies = lines.map((line) => (/^[+\- ]\s*\d*\s(.*)$/.exec(line)?.[1] ?? line.slice(1)).replace(/\t/g, "    "));
-		let highlighted: string[] = [];
-		try {
-			const code = bodies.join("\n");
-			const lang = getLanguageFromPath(path);
-			highlighted = shikiLines(code, path, palette) ?? (lang ? highlightCode(code, lang) : []);
-		} catch {
-			highlighted = [];
-		}
+		const code = bodies.join("\n");
+		const lang = getLanguageFromPath(path);
+		const highlighted = shikiLines(code, path, palette) ?? (lang ? highlightCode(code, lang) : []);
 		this.highlighted = highlighted.length === bodies.length ? highlighted : bodies.map((b) => theme.fg("toolTitle", b));
 
 		// Pair each run of removed lines with the added run right after it, line by line, and mark the changed words
@@ -474,7 +472,6 @@ export default function (pi: ExtensionAPI) {
 		if (!running && group.timer) {
 			clearInterval(group.timer);
 			group.timer = undefined;
-			group.ended = Date.now();
 		}
 	};
 
@@ -581,8 +578,8 @@ export default function (pi: ExtensionAPI) {
 		const source = m.toolName === "bash" ? m.args?.command : m.toolName === "codemode" ? m.args?.code : undefined;
 		const command = source === undefined ? m.label : `${m.toolName === "bash" ? "$ " : ""}${String(source).trim()}`;
 		const commandLines = command.split("\n");
-		const shown = commandLines.slice(0, 60).join("\n") + (commandLines.length > 60 ? `\n... ${commandLines.length - 60} more lines` : "");
-		const lines = wrapTextWithAnsi(theme.fg("toolTitle", shown), width);
+		const [shown, more] = clip(commandLines);
+		const lines = wrapTextWithAnsi(theme.fg("toolTitle", shown + (more && `\n${more}`)), width);
 		if (!m.result) return m.latest ? [...lines, ...wrapTextWithAnsi(theme.fg("dim", m.latest), width)] : lines;
 		const pis = pisResult.get(m.toolName);
 		if (pis) {
@@ -660,10 +657,6 @@ export default function (pi: ExtensionAPI) {
 			refresh(group);
 			return { handled: true };
 		});
-	const isOpen = (context: { expanded?: boolean; toolCallId?: string }) => {
-		const group = groupOf.get(context.toolCallId ?? "");
-		return group ? shown(group, context.expanded) : Boolean(context.expanded);
-	};
 
 	// The ● carries the status, like Claude Code: dim while arguments stream, accent while running, green or red when done.
 	// History rows redrawn after /reload have no execution state, so they count as done.
@@ -682,25 +675,23 @@ export default function (pi: ExtensionAPI) {
 			if (grouped) return grouped;
 			// Expanded, a shell command or a codemode script shows in full, with every line; collapsed rows keep the short label
 			const source = toolName === "bash" ? args?.command : toolName === "codemode" ? args?.code : undefined;
-			const lines = isOpen(context) && source !== undefined ? String(source ?? "").trim().split("\n") : undefined;
+			const lines = context.expanded && source !== undefined ? String(source ?? "").trim().split("\n") : undefined;
 			const prefix = toolName === "bash" ? "$ " : "codemode\n";
-			const text = lines ? `${prefix}${lines.slice(0, 60).join("\n")}${lines.length > 60 ? `\n... ${lines.length - 60} more lines` : ""}` : truncateToWidth(label(toolName, args, cwd), 400);
+			const [body, more] = lines ? clip(lines) : [];
+			const text = lines ? `${prefix}${body}${more && `\n${more}`}` : truncateToWidth(label(toolName, args, cwd), 400);
 			// Finished rows are dim without a dot; running and failed ones keep it
 			const done = status(context) === "success";
 			const mark = done ? "  " : dot(theme, context);
 			// Wrapped lines continue under the text, past the dot, instead of at the left edge
-			const row = {
+			return {
 				invalidate() {},
 				render: (width: number) =>
 					wrapTextWithAnsi(text, Math.max(10, width - 2)).map((line, i) => (i === 0 ? mark : "  ") + theme.fg(done ? "dim" : "toolTitle", line)),
 			};
-			// A row of a group opened by a click closes it again
-			const group = groupOf.get(context.toolCallId);
-			return group && shown(group, context.expanded) ? clickable(group, row, context.expanded) : row;
 		},
 		renderResult(result, { expanded }, theme, context) {
 			// A group's first row draws every call's output in its tree
-			if (groupOf.has(context.toolCallId) || (!expanded && !isOpen(context))) return empty();
+			if (groupOf.has(context.toolCallId) || !expanded) return empty();
 			return new Text(expandedBody(theme, resultText(result as Result)), 0, 0);
 		},
 	});

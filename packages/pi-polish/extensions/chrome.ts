@@ -91,31 +91,18 @@ export default function (pi: ExtensionAPI) {
 	};
 	// Just the verb for tools that pi-polish draws as live rows, which already show what is running;
 	// other extensions' tools keep their name, since their rows may not
-	const toolPhase = (name: string) => {
-		switch (name) {
-			case "bash":
-				return "Running";
-			case "read":
-				return "Reading";
-			case "edit":
-				return "Editing";
-			case "write":
-				return "Writing";
-			case "grep":
-			case "find":
-			case "tool_search":
-				return "Searching";
-			case "bg_run":
-				return "Starting a background job";
-			case "questionnaire":
-				return "Waiting for your answer";
-			default:
-				return name.startsWith("mcp__") ? "Calling" : `Running ${name}`;
-		}
+	const PHASES: Record<string, string> = {
+		bash: "Running",
+		read: "Reading",
+		edit: "Editing",
+		write: "Writing",
+		grep: "Searching",
+		find: "Searching",
+		tool_search: "Searching",
+		bg_run: "Starting a background job",
+		questionnaire: "Waiting for your answer",
 	};
-	pi.on("session_start", async (_event, ctx) => {
-		if (ctx.hasUI) ctx.ui.setWorkingIndicator({ frames: SPINNER, intervalMs: 120 });
-	});
+	const toolPhase = (name: string) => (Object.hasOwn(PHASES, name) ? PHASES[name] : undefined) ?? (name.startsWith("mcp__") ? "Calling" : `Running ${name}`);
 	pi.on("agent_start", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
 		showTurn(undefined);
@@ -170,17 +157,13 @@ export default function (pi: ExtensionAPI) {
 	};
 	pi.on("session_start", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
+		ctx.ui.setWorkingIndicator({ frames: SPINNER, intervalMs: 120 });
 		turnLine = undefined;
 		ctx.ui.setWidget("pi-polish-turn", (tui, theme) => {
 			redrawTurn = () => tui.requestRender();
 			return { invalidate() {}, render: (width: number) => (turnLine ? [truncateToWidth(theme.fg("dim", turnLine), width)] : []) };
 		});
-	});
-	pi.on("session_shutdown", async () => clearInterval(timer));
-
-	// ❯ before the input: two columns of editor padding, with the marker drawn into the first content line
-	pi.on("session_start", async (_event, ctx) => {
-		if (!ctx.hasUI) return;
+		// ❯ before the input: two columns of editor padding, with the marker drawn into the first content line
 		const previous = ctx.ui.getEditorComponent();
 		ctx.ui.setEditorComponent((tui, theme, keybindings) => {
 			const editor: any = previous?.(tui, theme, keybindings) ?? new CustomEditor(tui, theme, keybindings);
@@ -195,4 +178,5 @@ export default function (pi: ExtensionAPI) {
 			return editor;
 		});
 	});
+	pi.on("session_shutdown", async () => clearInterval(timer));
 }

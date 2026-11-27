@@ -61,8 +61,6 @@ export default function (pi: ExtensionAPI) {
 				redraw();
 			} catch {
 				// A suggestion is optional, so failures stay quiet
-			} finally {
-				if (pending === controller) pending = undefined;
 			}
 		})();
 	});
