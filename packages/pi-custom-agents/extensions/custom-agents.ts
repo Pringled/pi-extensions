@@ -15,6 +15,8 @@ interface Agent {
 	/** "fork" starts the agent from a copy of this conversation instead of from scratch */
 	context?: string;
 	prompt: string;
+	/** Why its file can't be used, such as frontmatter that isn't valid YAML */
+	error?: string;
 }
 
 interface Run {
@@ -37,8 +39,15 @@ function agents(): Agent[] {
 		return [];
 	}
 	return files.map((file) => {
-		const { frontmatter, body } = parseFrontmatter<{ description?: string; model?: string; context?: string }>(readFileSync(join(dir, file), "utf8"));
-		return { name: basename(file, ".md"), description: frontmatter.description, model: frontmatter.model, context: frontmatter.context, prompt: body.trim() };
+		const name = basename(file, ".md");
+		try {
+			const { frontmatter, body } = parseFrontmatter<{ description?: string; model?: string; context?: string }>(readFileSync(join(dir, file), "utf8"));
+			return { name, description: frontmatter.description, model: frontmatter.model, context: frontmatter.context, prompt: body.trim() };
+		} catch (error) {
+			// A broken file still shows, with what's wrong, instead of breaking the other agents
+			const message = `${file} can't be read: ${String((error as Error).message ?? error).split("\n")[0]}`;
+			return { name, description: message, prompt: "", error: message };
+		}
 	});
 }
 
@@ -210,6 +219,7 @@ export default function (pi: ExtensionAPI) {
 				return ctx.ui.notify(list.length ? `Agents:\n${list.join("\n")}` : `No agents yet: add a markdown file to ${join(getAgentDir(), "agents")}`, "info");
 			}
 			const agent = agents().find((agent) => agent.name === first);
+			if (agent?.error) return ctx.ui.notify(agent.error, "error");
 			const current = ctx.model && `${ctx.model.provider}/${ctx.model.id}`;
 			const label = agent ? named(args) : prompted(args);
 			const prompt = agent ? fill(agent.prompt, rest.join(" ")) : args.trim();
