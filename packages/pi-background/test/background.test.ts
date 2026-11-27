@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fauxAssistantMessage, fauxToolCall, plain, type PiOptions, startPi, until } from "../../../test/harness.mts";
@@ -9,16 +9,18 @@ const text = (message: any) => (typeof message.content === "string" ? message.co
 const last = (pi: { session: any }, role: string) => pi.session.messages.filter((m: any) => m.role === role).at(-1);
 
 /** A session whose model starts the command with bg_run and then answers each message with the given replies. */
-async function bgRun(command: (cwd: string) => string, replies: string[], options: Partial<PiOptions> = {}) {
+// Relative paths and a shebang, so the same command runs in Git Bash on Windows
+async function bgRun(command: string, replies: string[], options: Partial<PiOptions> = {}) {
 	const pi = await startPi({ extensions, ...options });
-	writeFileSync(join(pi.cwd, "job.sh"), "echo step 1\nsleep 1\necho finished\n");
-	chmodSync(join(pi.cwd, "job.sh"), 0o755);
-	pi.faux.setResponses([fauxAssistantMessage(fauxToolCall("bg_run", { command: command(pi.cwd) })), ...replies.map((reply) => fauxAssistantMessage(reply))]);
+	mkdirSync(join(pi.cwd, "scripts"));
+	writeFileSync(join(pi.cwd, "scripts/job.sh"), "#!/bin/sh\necho step 1\nsleep 1\necho finished\n");
+	chmodSync(join(pi.cwd, "scripts/job.sh"), 0o755);
+	pi.faux.setResponses([fauxAssistantMessage(fauxToolCall("bg_run", { command })), ...replies.map((reply) => fauxAssistantMessage(reply))]);
 	return pi;
 }
 
 test("a bg_run job shows in the jobs line while it runs and wakes Pi with its result when it exits", async () => {
-	const pi = await bgRun((cwd) => `cd ${cwd} && PYTHONPATH=/some/src ${cwd}/job.sh`, ["Started it.", "It finished."]);
+	const pi = await bgRun("cd . && PYTHONPATH=/some/src ./scripts/job.sh", ["Started it.", "It finished."]);
 	await pi.session.prompt("run the job");
 	assert.match((await until(() => pi.ui.widget("background-jobs")?.find((line) => line.includes("step 1"))))!, /^⏵ bg1 job\.sh · \ds · step 1$/);
 
@@ -30,7 +32,7 @@ test("a bg_run job shows in the jobs line while it runs and wakes Pi with its re
 });
 
 test("clicking a job in the jobs line opens its output, and clicking the title closes it", async () => {
-	const pi = await bgRun((cwd) => `${cwd}/job.sh`, ["Started it.", "It finished."]);
+	const pi = await bgRun("./scripts/job.sh", ["Started it.", "It finished."]);
 	await pi.session.prompt("run the job");
 	await until(() => pi.ui.widget("background-jobs")?.some((line) => line.includes("step 1")));
 
@@ -49,7 +51,7 @@ test("clicking a job in the jobs line opens its output, and clicking the title c
 });
 
 test("pi -p waits for a running job and lets Pi read its result before exiting", async () => {
-	const pi = await bgRun((cwd) => `${cwd}/job.sh`, ["Started it.", "It finished."], { mode: "print" });
+	const pi = await bgRun("./scripts/job.sh", ["Started it.", "It finished."], { mode: "print" });
 	await pi.session.prompt("run the job");
 	assert.equal(text(last(pi, "assistant")), "It finished.");
 	await pi.dispose();
