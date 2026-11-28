@@ -105,13 +105,13 @@ test("/bg scrolls output, kills a running job on double-tap x or /bg kill, and r
 	assert.equal(rendered[2], "   line 21");
 	assert.match(rendered.at(-2)!, /↑↓ 21–40\/40 · ← list · esc close/);
 
-	viewer.handleInput("k");
+	viewer.handleInput("\x1b[A"); // up
 	assert.equal(plain(viewer.render(100))[2], "   line 20");
-	viewer.handleInput("g");
+	viewer.handleInput("\x1b[H"); // home
 	assert.equal(plain(viewer.render(100))[2], "   line 1");
 	viewer.handleMouse({ type: "wheel", button: "none", x: 5, y: 5, wheelDelta: 5 });
 	assert.equal(plain(viewer.render(100))[2], "   line 6");
-	viewer.handleInput("G");
+	viewer.handleInput("\x1b[F"); // end
 	assert.equal(plain(viewer.render(100))[2], "   line 21");
 
 	// Left arrow goes back to the picker; pick bg2, then cancel on second return

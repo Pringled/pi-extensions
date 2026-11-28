@@ -1,4 +1,4 @@
-import { closeSync, createWriteStream, fstatSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
+import { closeSync, createWriteStream, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,9 +14,8 @@ import { Type } from "typebox";
 import { shortCommand } from "./command.ts";
 
 const TAIL_LINES = 20;
+const SCROLL_LINES = 1000;
 const TAIL_BYTES = 64 * 1024;
-// How much of a job's log /bg loads for scrolling, so huge logs stay fast
-const VIEW_BYTES = 512 * 1024;
 // A bash command still running after this long moves to the background, so it no longer blocks the turn
 const AUTO_BACKGROUND_SECS = 120;
 const WAKE_DEBOUNCE_MS = 1000;
@@ -54,37 +53,26 @@ interface Job {
 	watched: boolean;
 }
 
+/** Reads up to the last lines from the final TAIL_BYTES of a log file without loading the whole file. */
 function tail(path: string, lines: number): string {
-	try {
-		const text = readFileSync(path).subarray(-TAIL_BYTES).toString("utf8");
-		return text.trimEnd().split("\n").slice(-lines).join("\n") || "(no output)";
-	} catch {
-		return "(no output)";
-	}
-}
-
-/** Reads up to the last VIEW_BYTES of a log file as lines, skipping the read when the file size hasn't changed. */
-function readLog(path: string, lastSize: number): { size: number; lines: string[]; truncated: boolean } | undefined {
 	let fd: number;
 	try {
 		fd = openSync(path, "r");
 	} catch {
-		return lastSize === 0 ? undefined : { size: 0, lines: [], truncated: false };
+		return "(no output)";
 	}
 	try {
 		const size = fstatSync(fd).size;
-		if (size === lastSize) return undefined;
-		if (size === 0) return { size: 0, lines: [], truncated: false };
-		const truncated = size > VIEW_BYTES;
-		const start = truncated ? size - VIEW_BYTES : 0;
+		if (size === 0) return "(no output)";
+		const start = Math.max(0, size - TAIL_BYTES);
 		const buf = Buffer.alloc(size - start);
 		let text = buf.subarray(0, readSync(fd, buf, 0, buf.length, start)).toString("utf8");
-		if (truncated) {
+		// Start on a full line when the read began mid-line
+		if (start > 0) {
 			const nl = text.indexOf("\n");
 			if (nl >= 0) text = text.slice(nl + 1);
 		}
-		const trimmed = text.trimEnd();
-		return { size, lines: trimmed ? trimmed.split("\n") : [], truncated };
+		return text.trimEnd().split("\n").slice(-lines).join("\n") || "(no output)";
 	} finally {
 		closeSync(fd);
 	}
@@ -680,23 +668,18 @@ export default function (pi: ExtensionAPI) {
 				viewing = shown;
 				redrawJobs();
 				const log = shown.log.replace(homedir(), "~");
-				const action = await ctx.ui.custom<"back" | "close">((tui, theme, kb, done) => {
-					let lastSize = -1;
-					let lines: string[] = [];
-					let truncated = false;
+				const action = await ctx.ui.custom<"back" | "close">((tui, theme, _kb, done) => {
 					// null follows the bottom as new output arrives; a number pins the top visible line while scrolling
 					let scrollTop: number | null = null;
 					let confirmKill = false;
-					const refresh = () => {
-						const next = readLog(shown.log, lastSize);
-						if (!next) return;
-						({ size: lastSize, lines, truncated } = next);
+					const readLines = () => {
+						const text = tail(shown.log, SCROLL_LINES);
+						return text === "(no output)" ? [] : text.split("\n");
 					};
 					// At most half the terminal, so the conversation above stays in view
 					const pageHeight = () => Math.max(3, Math.min(TAIL_LINES, Math.floor(tui.terminal.rows / 2)));
 					const scroll = (delta: number) => {
-						refresh();
-						const maxTop = Math.max(0, lines.length - pageHeight());
+						const maxTop = Math.max(0, readLines().length - pageHeight());
 						const current = scrollTop === null ? maxTop : Math.min(scrollTop, maxTop);
 						const target = Math.max(0, Math.min(maxTop, current + delta));
 						scrollTop = target >= maxTop ? null : target;
@@ -712,26 +695,22 @@ export default function (pi: ExtensionAPI) {
 								if (data === "x" && shown.status === "running") shown.controller.abort();
 								return tui.requestRender();
 							}
-							if (kb?.matches(data, "tui.select.cancel") || matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || data === "q") return done("close");
+							if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || data === "q") return done("close");
 							if ((matchesKey(data, Key.left) || matchesKey(data, Key.backspace)) && jobs.size > 1) return done("back");
 							if (data === "x" && shown.status === "running") {
 								confirmKill = true;
 								return tui.requestRender();
 							}
 							const page = pageHeight();
-							const halfPage = Math.max(1, Math.floor(page / 2));
-							if (kb?.matches(data, "tui.select.up") || kb?.matches(data, "tui.altScreen.lineUp") || matchesKey(data, Key.up) || data === "k") return scroll(-1);
-							if (kb?.matches(data, "tui.select.down") || kb?.matches(data, "tui.altScreen.lineDown") || matchesKey(data, Key.down) || data === "j") return scroll(1);
-							if (kb?.matches(data, "tui.altScreen.halfPageUp") || matchesKey(data, Key.ctrl("u"))) return scroll(-halfPage);
-							if (kb?.matches(data, "tui.altScreen.halfPageDown") || matchesKey(data, Key.ctrl("d"))) return scroll(halfPage);
-							if (kb?.matches(data, "tui.select.pageUp") || kb?.matches(data, "tui.altScreen.pageUp") || matchesKey(data, Key.pageUp) || data === "b") return scroll(-page);
-							if (kb?.matches(data, "tui.select.pageDown") || kb?.matches(data, "tui.altScreen.pageDown") || matchesKey(data, Key.pageDown) || matchesKey(data, Key.space)) return scroll(page);
-							if (kb?.matches(data, "tui.altScreen.top") || matchesKey(data, Key.home) || data === "g") {
-								refresh();
-								scrollTop = lines.length > page ? 0 : null;
+							if (matchesKey(data, Key.up)) return scroll(-1);
+							if (matchesKey(data, Key.down)) return scroll(1);
+							if (matchesKey(data, Key.pageUp)) return scroll(-page);
+							if (matchesKey(data, Key.pageDown)) return scroll(page);
+							if (matchesKey(data, Key.home)) {
+								scrollTop = readLines().length > page ? 0 : null;
 								return tui.requestRender();
 							}
-							if (kb?.matches(data, "tui.altScreen.bottom") || matchesKey(data, Key.end) || data === "G") {
+							if (matchesKey(data, Key.end)) {
 								scrollTop = null;
 								return tui.requestRender();
 							}
@@ -747,12 +726,12 @@ export default function (pi: ExtensionAPI) {
 							return { handled: true };
 						},
 						render(width: number) {
-							refresh();
 							if (confirmKill && shown.status !== "running") confirmKill = false;
 							const color = shown.status === "running" ? "accent" : shown.status === "exited" && shown.exitCode === 0 ? "success" : "error";
 							const title = theme.fg(color, " ● ") + theme.fg("toolTitle", `${shown.id} ${shownCommand(shown.command)}`);
 							const status = theme.fg("muted", `${state(shown)} · ${elapsed(shown)} `);
 							const gap = Math.max(1, width - visibleWidth(title) - visibleWidth(status));
+							const lines = readLines();
 							const page = pageHeight();
 							const maxTop = Math.max(0, lines.length - page);
 							const top = scrollTop === null ? maxTop : Math.min(scrollTop, maxTop);
@@ -763,7 +742,7 @@ export default function (pi: ExtensionAPI) {
 								: theme.fg(
 										"dim",
 										` ${[
-											maxTop > 0 ? `↑↓ ${top + 1}–${top + slice.length}/${lines.length}${truncated ? "+" : ""}` : "",
+											maxTop > 0 ? `↑↓ ${top + 1}–${top + slice.length}/${lines.length}` : "",
 											shown.status === "running" ? "x kill" : "",
 											jobs.size > 1 ? "← list" : "",
 											"esc close",
