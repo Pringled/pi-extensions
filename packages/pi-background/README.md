@@ -18,7 +18,7 @@ pi install npm:pi-background
 - Pi can wait for a specific line, such as a dev server's `listening on`, without checking again and again.
 - Jobs started together are reported together, so Pi answers once when the last one finishes instead of after each.
 - A shell command still running after 2 minutes moves to the background by itself, so it never holds up the turn. `ctrl+b` moves one sooner.
-- In `pi -p` and `--mode json`, Pi waits for running jobs and reads their results before it exits.
+- In `pi -p` and `--mode json`, Pi waits for running jobs and reads their results before it exits. With `PI_BACKGROUND_SETTLE_WAIT=1`, `--mode rpc` waits too, for hosts that treat the first settle as the end of the turn.
 
 Pi decides when a job belongs in the background, and you can also ask, for example "run the tests in the background and tell me when they're done".
 
@@ -33,6 +33,8 @@ The running jobs line has three levels. Set one in `~/.pi/agent/settings.json`, 
 | `off` | Nothing |
 
 In `pi -p` and `--mode json`, Pi waits up to 30 minutes for running jobs. Change it with `"background": { "exitWait": 120 }` (in minutes), or `0` for no limit.
+
+In `--mode rpc` the wait is off by default, because a host that reads events live (Pi Web, an editor) wants the turn to settle and hear about the job later. Set `PI_BACKGROUND_SETTLE_WAIT=1` in the environment of the process that starts `pi --mode rpc` when that host instead ends the turn on the first `agent_settled` and stops forwarding events: the job then finishes, its report is read, and the settle arrives once, after the answer. It uses the same `exitWait` limit. A stop is honored at the next settle point, which for a host that stops the process (as Open WebUI does) is immediate, because Pi aborts the waiting job on shutdown.
 
 The shortcut that moves a running command to the background is `ctrl+b`. Change it with `"background": { "key": "alt+b" }` (for example when tmux uses `ctrl+b`), or `"off"` to disable it.
 

@@ -57,6 +57,120 @@ test("pi -p waits for a running job and lets Pi read its result before exiting",
 	await pi.dispose();
 });
 
+// --mode rpc waits only when the process that started pi asked for it, since a host reading events live does not
+const rpcSettleWait = (on: boolean) => (on ? (process.env.PI_BACKGROUND_SETTLE_WAIT = "1") : delete process.env.PI_BACKGROUND_SETTLE_WAIT);
+const reports = (pi: { session: any }) => pi.session.messages.filter((m: any) => m.customType === "background-job");
+
+test("--mode rpc waits for a running job when PI_BACKGROUND_SETTLE_WAIT=1 and reads its result", async () => {
+	rpcSettleWait(true);
+	const pi = await startPi({
+		extensions,
+		mode: "rpc",
+		replies: [fauxAssistantMessage(fauxToolCall("bg_run", { command: "sh -c 'sleep 2; echo finished'" })), fauxAssistantMessage("Started it."), fauxAssistantMessage("It finished.")],
+	});
+	const settles: string[] = [];
+	pi.session.subscribe((event: any) => event.type === "agent_settled" && settles.push("settled"));
+	await pi.session.prompt("run the job");
+	assert.equal(reports(pi).length, 1);
+	assert.equal(text(last(pi, "assistant")), "It finished.");
+	assert.deepEqual(settles, ["settled"]);
+	rpcSettleWait(false);
+	await pi.dispose();
+});
+
+test("--mode rpc settles with the job still running when PI_BACKGROUND_SETTLE_WAIT is not set", async () => {
+	const pi = await bgRun("sleep 30", ["Started it."], { mode: "rpc" });
+	const started = Date.now();
+	await pi.session.prompt("run the job");
+	assert.ok(Date.now() - started < 10_000);
+	assert.deepEqual(reports(pi), []);
+	assert.equal(text(last(pi, "assistant")), "Started it.");
+	await pi.dispose();
+});
+
+test("--mode rpc with PI_BACKGROUND_SETTLE_WAIT=1 honors a stop at the settle that follows the job", async () => {
+	rpcSettleWait(true);
+	const pi = await startPi({
+		extensions,
+		mode: "rpc",
+		replies: [fauxAssistantMessage(fauxToolCall("bg_run", { command: "sh -c 'sleep 2; echo finished'" })), fauxAssistantMessage("Started it.")],
+	});
+	const aborted: boolean[] = [];
+	pi.session.subscribe((event: any) => event.type === "agent_settled" && aborted.push(event.aborted));
+	const started = Date.now();
+	const prompt = pi.session.prompt("run the job");
+	await new Promise((resolve) => setTimeout(resolve, 500));
+	await pi.session.abort();
+	await prompt;
+	assert.ok(Date.now() - started < 10_000);
+	// The stop is recorded, and the result that was on its way to the model is discarded, not delivered late
+	assert.deepEqual(aborted, [true]);
+	assert.deepEqual(reports(pi), []);
+	rpcSettleWait(false);
+	await pi.dispose();
+});
+
+test("--mode rpc with PI_BACKGROUND_SETTLE_WAIT=1 reads a failing job's exit code before settling", async () => {
+	rpcSettleWait(true);
+	const pi = await bgRun("sh -c 'echo boom; exit 3'", ["Started it.", "It failed."], { mode: "rpc" });
+	await pi.session.prompt("run the job");
+	assert.match(text(reports(pi).at(-1)), /^Background job finished: bg1 \[exit 3, \ds\]/);
+	assert.equal(text(last(pi, "assistant")), "It failed.");
+	rpcSettleWait(false);
+	await pi.dispose();
+});
+
+test("--mode rpc with PI_BACKGROUND_SETTLE_WAIT=1 reports jobs started together once and settles after both", async () => {
+	rpcSettleWait(true);
+	const pi = await startPi({
+		extensions,
+		mode: "rpc",
+		replies: [
+			fauxAssistantMessage([fauxToolCall("bg_run", { command: "sh -c 'sleep 1; echo one'" }), fauxToolCall("bg_run", { command: "sh -c 'sleep 2; echo two'" })]),
+			fauxAssistantMessage("Started both."),
+			fauxAssistantMessage("Both finished."),
+		],
+	});
+	const events: string[] = [];
+	pi.session.subscribe((event: any) => events.push(event.type));
+	await pi.session.prompt("run both jobs");
+	const finished = reports(pi).map((m: any) => text(m));
+	assert.equal(finished.length, 2);
+	assert.match(finished[0], /^Background job finished: bg1 \[exit 0/);
+	assert.match(finished[1], /^Background job finished: bg2 \[exit 0/);
+	assert.equal(text(last(pi, "assistant")), "Both finished.");
+	assert.equal(events.filter((type) => type === "agent_settled").length, 1);
+	rpcSettleWait(false);
+	await pi.dispose();
+});
+
+test("--mode rpc with PI_BACKGROUND_SETTLE_WAIT=1 gives up at background.exitWait and settles with the job running", async () => {
+	rpcSettleWait(true);
+	const pi = await bgRun("sleep 30", ["Started it."], { mode: "rpc", settings: { background: { exitWait: 0.05 } } });
+	const started = Date.now();
+	await pi.session.prompt("run the job");
+	const elapsed = Date.now() - started;
+	assert.ok(elapsed >= 2500 && elapsed < 15_000, `settled after ${elapsed}ms`);
+	assert.deepEqual(reports(pi), []);
+	rpcSettleWait(false);
+	await pi.dispose();
+});
+
+test("--mode rpc with PI_BACKGROUND_SETTLE_WAIT=1 does not wait for a wake_on job", async () => {
+	rpcSettleWait(true);
+	const pi = await startPi({
+		extensions,
+		mode: "rpc",
+		replies: [fauxAssistantMessage(fauxToolCall("bg_run", { command: "sleep 30", wake_on: "never-printed" })), fauxAssistantMessage("Started it.")],
+	});
+	const started = Date.now();
+	await pi.session.prompt("run the job");
+	assert.ok(Date.now() - started < 10_000);
+	assert.deepEqual(reports(pi), []);
+	rpcSettleWait(false);
+	await pi.dispose();
+});
+
 // Each case waits for the hint, which shows after 3 seconds
 for (const [setting, key, data] of [[undefined, "ctrl+b", "\x02"], ["off", undefined, "\x02"]] as const) {
 	test(`a running bash command moves to the background with ${key ?? "no key"} when background.key is ${setting ?? "unset"}`, async () => {
