@@ -82,3 +82,59 @@ for (const [setting, key, data] of [[undefined, "ctrl+b", "\x02"], ["off", undef
 		await pi.dispose();
 	});
 }
+
+test("/bg scrolls output, kills a running job on double-tap x or /bg kill, and returns to the list with left arrow", async () => {
+	const pi = await startPi({ extensions });
+	mkdirSync(join(pi.cwd, "scripts"));
+	writeFileSync(join(pi.cwd, "scripts/lines.sh"), "#!/bin/sh\ni=1\nwhile [ $i -le 40 ]; do\n  echo \"line $i\"\n  i=$((i + 1))\ndone\n");
+	writeFileSync(join(pi.cwd, "scripts/wait.sh"), "#!/bin/sh\necho waiting\nsleep 30\n");
+	chmodSync(join(pi.cwd, "scripts/lines.sh"), 0o755);
+	chmodSync(join(pi.cwd, "scripts/wait.sh"), 0o755);
+	pi.faux.setResponses([
+		fauxAssistantMessage([fauxToolCall("bg_run", { command: "./scripts/lines.sh" }), fauxToolCall("bg_run", { command: "./scripts/wait.sh" }), fauxToolCall("bg_run", { command: "./scripts/wait.sh" })]),
+		fauxAssistantMessage("Started."),
+		fauxAssistantMessage("Done."),
+	]);
+	await pi.session.prompt("run jobs");
+	await until(() => pi.ui.widget("background-jobs")?.filter((line) => line.includes("waiting")).length === 2);
+
+	// Open bg1 (40 lines) and test scrolling + back-to-list -> pick bg2 -> double-tap x to kill
+	const bgCommand = pi.command("/bg bg1");
+	let viewer = await until(() => pi.ui.open?.component);
+	let rendered = plain(viewer.render(100));
+	assert.equal(rendered[2], "   line 21");
+	assert.match(rendered.at(-2)!, /↑↓ 21–40\/40 · ← list · esc close/);
+
+	viewer.handleInput("\x1b[A"); // up
+	assert.equal(plain(viewer.render(100))[2], "   line 20");
+	viewer.handleInput("\x1b[H"); // home
+	assert.equal(plain(viewer.render(100))[2], "   line 1");
+	viewer.handleMouse({ type: "wheel", button: "none", x: 5, y: 5, wheelDelta: 5 });
+	assert.equal(plain(viewer.render(100))[2], "   line 6");
+	viewer.handleInput("\x1b[F"); // end
+	assert.equal(plain(viewer.render(100))[2], "   line 21");
+
+	// Left arrow goes back to the picker; pick bg2, then cancel on second return
+	pi.ui.answers.push((options: string[]) => options.find((o) => o.startsWith("bg2")), undefined);
+	viewer.handleInput("\x1b[D");
+	await until(() => pi.ui.dialogs.length === 1);
+	viewer = await until(() => pi.ui.open?.component && plain(pi.ui.open.component.render(100))[1].includes("bg2") ? pi.ui.open.component : undefined);
+	assert.match(plain(viewer.render(100)).at(-2)!, /x kill · ← list · esc close/);
+
+	// Single x warns without killing; another key cancels; double-tap x kills bg2
+	viewer.handleInput("x");
+	assert.match(plain(viewer.render(100)).at(-2)!, /press x again to kill bg2/);
+	viewer.handleInput("j");
+	assert.match(plain(viewer.render(100)).at(-2)!, /x kill/);
+	viewer.handleInput("x");
+	viewer.handleInput("x");
+	await until(() => plain(viewer.render(100))[1].includes("killed"));
+	viewer.handleInput("\x1b[D");
+	await bgCommand;
+
+	// /bg kill stops bg3 directly
+	await pi.command("/bg kill 3");
+	assert.equal(pi.ui.notes.at(-1)?.message, "Stopping bg3");
+	await until(() => pi.ui.widget("background-jobs")?.length === 0);
+	await pi.dispose();
+});

@@ -14,7 +14,7 @@ pi install npm:pi-background
 ## Features
 
 - Long commands like downloads, builds, test suites and training runs run in the background, and Pi gets the exit code and the end of the output when they finish.
-- Running jobs show above the input, for example `⏵ bg1 python3 train.py · 4m12s · epoch 3/10 loss 0.41`. Click one or run `/bg` to see its live output. A job that has been silent for 10 minutes is flagged, so a stuck one stands out.
+- Running jobs show above the input, for example `⏵ bg1 python3 train.py · 4m12s · epoch 3/10 loss 0.41`. Click one or run `/bg` to see and scroll its live output (double-tap `x` or run `/bg kill <id>` to stop a running job, `←` to go back to the job list). A job that has been silent for 10 minutes is flagged, so a stuck one stands out.
 - Pi can wait for a specific line, such as a dev server's `listening on`, without checking again and again.
 - Jobs started together are reported together, so Pi answers once when the last one finishes instead of after each.
 - A shell command still running after 2 minutes moves to the background by itself, so it never holds up the turn. `ctrl+b` moves one sooner.

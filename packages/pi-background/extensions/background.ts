@@ -1,4 +1,4 @@
-import { closeSync, createWriteStream, fstatSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
+import { closeSync, createWriteStream, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,6 +14,7 @@ import { Type } from "typebox";
 import { shortCommand } from "./command.ts";
 
 const TAIL_LINES = 20;
+const SCROLL_LINES = 1000;
 const TAIL_BYTES = 64 * 1024;
 // A bash command still running after this long moves to the background, so it no longer blocks the turn
 const AUTO_BACKGROUND_SECS = 120;
@@ -52,12 +53,28 @@ interface Job {
 	watched: boolean;
 }
 
+/** Reads up to the last lines from the final TAIL_BYTES of a log file without loading the whole file. */
 function tail(path: string, lines: number): string {
+	let fd: number;
 	try {
-		const text = readFileSync(path).subarray(-TAIL_BYTES).toString("utf8");
-		return text.trimEnd().split("\n").slice(-lines).join("\n") || "(no output)";
+		fd = openSync(path, "r");
 	} catch {
 		return "(no output)";
+	}
+	try {
+		const size = fstatSync(fd).size;
+		if (size === 0) return "(no output)";
+		const start = Math.max(0, size - TAIL_BYTES);
+		const buf = Buffer.alloc(size - start);
+		let text = buf.subarray(0, readSync(fd, buf, 0, buf.length, start)).toString("utf8");
+		// Start on a full line when the read began mid-line
+		if (start > 0) {
+			const nl = text.indexOf("\n");
+			if (nl >= 0) text = text.slice(nl + 1);
+		}
+		return text.trimEnd().split("\n").slice(-lines).join("\n") || "(no output)";
+	} finally {
+		closeSync(fd);
 	}
 }
 
@@ -610,74 +627,166 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	// "/bg 2" works as well as "/bg bg2"
+	const normalizeJobId = (raw: string) => raw.trim().toLowerCase().replace(/^(\d+)$/, "bg$1");
+
 	let viewerOpen = false;
-	// Shows a job's latest output in place of the input until esc, refreshed every second while it runs
+	// Shows a job's output in place of the input until esc, refreshed every second while it runs
 	const showJob = async (args: string, ctx: ExtensionContext) => {
 		if (!ctx.hasUI || viewerOpen) return;
-		const all = [...jobs.values()].reverse();
-		if (all.length === 0) return ctx.ui.notify("No background jobs yet", "info");
-		// "/bg 2" works as well as "/bg bg2"
-		const wanted = args.trim().toLowerCase().replace(/^(\d+)$/, "bg$1");
-		let job = wanted ? jobs.get(wanted) : all.length === 1 ? all[0] : undefined;
-		if (wanted && !job) return ctx.ui.notify(`No background job ${args.trim()}; there's ${[...jobs.keys()].join(", ")}`, "warning");
+		const trimmed = args.trim();
+		const killMatch = /^kill(?:\s+(.+))?$/i.exec(trimmed);
+		if (killMatch) {
+			const idArg = killMatch[1]?.trim();
+			if (!idArg) return ctx.ui.notify("Usage: /bg kill <id>", "info");
+			const target = jobs.get(normalizeJobId(idArg));
+			if (!target) return ctx.ui.notify(`No background job ${idArg}; there's ${[...jobs.keys()].join(", ") || "none"}`, "warning");
+			if (target.status !== "running") return ctx.ui.notify(`${target.id} already ${target.status}`, "info");
+			target.controller.abort();
+			return ctx.ui.notify(`Stopping ${target.id}`, "info");
+		}
+		if (jobs.size === 0) return ctx.ui.notify("No background jobs yet", "info");
+		const wanted = trimmed ? normalizeJobId(trimmed) : "";
+		let job: Job | undefined = wanted ? jobs.get(wanted) : jobs.size === 1 ? [...jobs.values()][0] : undefined;
+		if (wanted && !job) return ctx.ui.notify(`No background job ${trimmed}; there's ${[...jobs.keys()].join(", ")}`, "warning");
 		viewerOpen = true;
 		try {
-			if (!job) {
-				// Running jobs first, then the latest finished ones
-				const listed = [...all.filter((other) => other.status === "running"), ...all.filter((other) => other.status !== "running").slice(0, MAX_LISTED_FINISHED)];
-				// Matched by position, since the elapsed time in a label changes while the list is open
-				// Ids and commands padded to one width, so the states and times line up
-				const idWidth = Math.max(...listed.map((other) => other.id.length));
-				const commandWidth = Math.max(...listed.map((other) => shownCommand(other.command).length));
-				const options = listed.map((other) => `${other.id.padEnd(idWidth)} ${shownCommand(other.command).padEnd(commandWidth)} · ${state(other)} · ${elapsed(other)}`);
-				job = listed[options.indexOf((await ctx.ui.select("Background jobs", options)) ?? "")];
-				if (!job) return;
+			while (true) {
+				if (!job) {
+					const all = [...jobs.values()].reverse();
+					// Running jobs first, then the latest finished ones
+					const listed = [...all.filter((other) => other.status === "running"), ...all.filter((other) => other.status !== "running").slice(0, MAX_LISTED_FINISHED)];
+					// Matched by position, since the elapsed time in a label changes while the list is open
+					// Ids and commands padded to one width, so the states and times line up
+					const idWidth = Math.max(...listed.map((other) => other.id.length));
+					const commandWidth = Math.max(...listed.map((other) => shownCommand(other.command).length));
+					const options = listed.map((other) => `${other.id.padEnd(idWidth)} ${shownCommand(other.command).padEnd(commandWidth)} · ${state(other)} · ${elapsed(other)}`);
+					job = listed[options.indexOf((await ctx.ui.select("Background jobs", options)) ?? "")];
+					if (!job) return;
+				}
+				const shown = job;
+				viewing = shown;
+				redrawJobs();
+				const log = shown.log.replace(homedir(), "~");
+				const action = await ctx.ui.custom<"back" | "close">((tui, theme, _kb, done) => {
+					// null follows the bottom as new output arrives; a number pins the top visible line while scrolling
+					let scrollTop: number | null = null;
+					let confirmKill = false;
+					const readLines = () => {
+						const text = tail(shown.log, SCROLL_LINES);
+						return text === "(no output)" ? [] : text.split("\n");
+					};
+					// At most half the terminal, so the conversation above stays in view
+					const pageHeight = () => Math.max(3, Math.min(TAIL_LINES, Math.floor(tui.terminal.rows / 2)));
+					const scroll = (delta: number) => {
+						const maxTop = Math.max(0, readLines().length - pageHeight());
+						const current = scrollTop === null ? maxTop : Math.min(scrollTop, maxTop);
+						const target = Math.max(0, Math.min(maxTop, current + delta));
+						scrollTop = target >= maxTop ? null : target;
+						tui.requestRender();
+					};
+					const timer = setInterval(() => tui.requestRender(), 1000);
+					return {
+						dispose: () => clearInterval(timer),
+						invalidate() {},
+						handleInput: (data: string) => {
+							if (confirmKill) {
+								confirmKill = false;
+								if (data === "x" && shown.status === "running") shown.controller.abort();
+								return tui.requestRender();
+							}
+							if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || data === "q") return done("close");
+							if ((matchesKey(data, Key.left) || matchesKey(data, Key.backspace)) && jobs.size > 1) return done("back");
+							if (data === "x" && shown.status === "running") {
+								confirmKill = true;
+								return tui.requestRender();
+							}
+							const page = pageHeight();
+							if (matchesKey(data, Key.up)) return scroll(-1);
+							if (matchesKey(data, Key.down)) return scroll(1);
+							if (matchesKey(data, Key.pageUp)) return scroll(-page);
+							if (matchesKey(data, Key.pageDown)) return scroll(page);
+							if (matchesKey(data, Key.home)) {
+								scrollTop = readLines().length > page ? 0 : null;
+								return tui.requestRender();
+							}
+							if (matchesKey(data, Key.end)) {
+								scrollTop = null;
+								return tui.requestRender();
+							}
+						},
+						// Clicking the title row closes it again, like a click opened it from the jobs line
+						handleMouse: (event: TuiMouseEvent) => {
+							if (event.type === "wheel" && event.wheelDelta) {
+								scroll(event.wheelDelta);
+								return { handled: true };
+							}
+							if (event.type !== "click" || event.button !== "left" || event.y !== 1) return undefined;
+							done("close");
+							return { handled: true };
+						},
+						render(width: number) {
+							if (confirmKill && shown.status !== "running") confirmKill = false;
+							const color = shown.status === "running" ? "accent" : shown.status === "exited" && shown.exitCode === 0 ? "success" : "error";
+							const title = theme.fg(color, " ● ") + theme.fg("toolTitle", `${shown.id} ${shownCommand(shown.command)}`);
+							const status = theme.fg("muted", `${state(shown)} · ${elapsed(shown)} `);
+							const gap = Math.max(1, width - visibleWidth(title) - visibleWidth(status));
+							const lines = readLines();
+							const page = pageHeight();
+							const maxTop = Math.max(0, lines.length - page);
+							const top = scrollTop === null ? maxTop : Math.min(scrollTop, maxTop);
+							const slice = lines.slice(top, top + page);
+							const output = slice.length === 0 ? [theme.fg("dim", theme.italic("   no output yet"))] : slice.map((line) => `   ${cleanLine(line)}`);
+							const footer = confirmKill
+								? theme.fg("warning", ` press x again to kill ${shown.id}`)
+								: theme.fg(
+										"dim",
+										` ${[
+											maxTop > 0 ? `↑↓ ${top + 1}–${top + slice.length}/${lines.length}` : "",
+											shown.status === "running" ? "x kill" : "",
+											jobs.size > 1 ? "← list" : "",
+											"esc close",
+											log,
+										]
+											.filter(Boolean)
+											.join(" · ")}`,
+									);
+							return [
+								theme.fg("borderMuted", "─".repeat(width)),
+								title + " ".repeat(gap) + status,
+								...output,
+								footer,
+								theme.fg("borderMuted", "─".repeat(width)),
+							].map((line) => truncateToWidth(line, width));
+						},
+					};
+				});
+				viewing = undefined;
+				redrawJobs();
+				if (action !== "back") return;
+				job = undefined;
 			}
-			const shown = job;
-			viewing = shown;
-			const log = shown.log.replace(homedir(), "~");
-			await ctx.ui.custom<void>((tui, theme, _kb, done) => {
-				const timer = setInterval(() => tui.requestRender(), 1000);
-				return {
-					dispose: () => clearInterval(timer),
-					invalidate() {},
-					handleInput: (data: string) => {
-						if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || data === "q") done();
-					},
-					// Clicking the title row closes it again, like a click opened it from the jobs line
-					handleMouse: (event: TuiMouseEvent) => {
-						if (event.type !== "click" || event.button !== "left" || event.y !== 1) return undefined;
-						done();
-						return { handled: true };
-					},
-					render(width: number) {
-						const color = shown.status === "running" ? "accent" : shown.status === "exited" && shown.exitCode === 0 ? "success" : "error";
-						const title = theme.fg(color, " ● ") + theme.fg("toolTitle", `${shown.id} ${shownCommand(shown.command)}`);
-						const status = theme.fg("muted", `${state(shown)} · ${elapsed(shown)} `);
-						const gap = Math.max(1, width - visibleWidth(title) - visibleWidth(status));
-						// At most half the terminal, so the conversation above stays in view
-						const text = tail(shown.log, Math.max(3, Math.min(TAIL_LINES, Math.floor(tui.terminal.rows / 2))));
-						const output = text === "(no output)" ? [theme.fg("dim", theme.italic("   no output yet"))] : text.split("\n").map((line) => `   ${cleanLine(line)}`);
-						return [
-							theme.fg("borderMuted", "─".repeat(width)),
-							title + " ".repeat(gap) + status,
-							...output,
-							theme.fg("dim", ` esc to close · ${log}`),
-							theme.fg("borderMuted", "─".repeat(width)),
-						].map((line) => truncateToWidth(line, width));
-					},
-				};
-			});
 		} finally {
 			viewerOpen = false;
 			viewing = undefined;
+			redrawJobs();
 		}
 	};
 	pi.registerCommand("bg", {
-		description: "Show a background job's latest output",
+		description: "Show or stop a background job",
 		getArgumentCompletions: (prefix) => {
-			const matching = [...jobs.values()].filter((job) => job.id.startsWith(prefix.trim().toLowerCase()));
-			return matching.length ? matching.map((job) => ({ value: job.id, label: job.id, description: `${shownCommand(job.command)} · ${state(job)}` })) : null;
+			const lower = prefix.trimStart().toLowerCase();
+			if (lower.startsWith("kill ")) {
+				const rest = lower.slice(5).trim();
+				const matching = running().filter((job) => job.id.startsWith(rest));
+				return matching.length ? matching.map((job) => ({ value: `kill ${job.id}`, label: `kill ${job.id}`, description: shownCommand(job.command) })) : null;
+			}
+			const matching = [...jobs.values()].filter((job) => job.id.startsWith(lower.trim()));
+			const items = matching.map((job) => ({ value: job.id, label: job.id, description: `${shownCommand(job.command)} · ${state(job)}` }));
+			if ("kill".startsWith(lower.trim()) && running().length > 0) {
+				items.push({ value: "kill ", label: "kill <id>", description: "Stop a running background job" });
+			}
+			return items.length ? items : null;
 		},
 		handler: showJob,
 	});
