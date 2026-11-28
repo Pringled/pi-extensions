@@ -13,6 +13,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,4 +26,4 @@ jobs:
       - name: Typecheck
         run: npx tsc -p .
       - name: Test
-        run: node --test "packages/*/test/*.test.ts"
+        run: node --test --test-force-exit "packages/*/test/*.test.ts"
