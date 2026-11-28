@@ -34,12 +34,6 @@ const EXIT_WAIT_MINUTES = 30;
 // How often that wait looks again, short enough to notice a finishing job straight away
 const SETTLE_POLL_MS = 250;
 
-// Modes that wait for running jobs before settling. Print and json exit with the settle, so they always wait. RPC keeps
-// the process alive for its caller, but some callers treat the first settle as the end of the turn and stop reading
-// (Open WebUI does; Pi Web does not), so there it is opt-in: PI_BACKGROUND_SETTLE_WAIT=1 in the caller's environment.
-const waitsBeforeSettle = (mode: string) =>
-	mode === "print" || mode === "json" || (mode === "rpc" && process.env.PI_BACKGROUND_SETTLE_WAIT === "1");
-
 interface Job {
 	id: string;
 	command: string;
@@ -831,7 +825,7 @@ export default function (pi: ExtensionAPI) {
 	// with PI_BACKGROUND_SETTLE_WAIT=1; the TUI never waits, someone is chatting there
 	// Jobs started with wake_on, such as a dev server, may never end, so they never hold the exit
 	pi.on("agent_before_settle", async (_event, ctx) => {
-		if (!waitsBeforeSettle(ctx.mode)) return;
+		if (ctx.mode !== "print" && ctx.mode !== "json" && !(ctx.mode === "rpc" && process.env.PI_BACKGROUND_SETTLE_WAIT === "1")) return;
 		const seen = triggerWakes;
 		const until = Date.now() + exitWaitMs();
 		while ((running().some((job) => !job.watched) || ending > 0) && triggerWakes === seen && Date.now() < until) {
