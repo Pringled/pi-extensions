@@ -50,12 +50,19 @@ test("clicking a job in the jobs line opens its output, and clicking the title c
 	await pi.dispose();
 });
 
-test("pi -p waits for a running job and lets Pi read its result before exiting", async () => {
-	const pi = await bgRun("./scripts/job.sh", ["Started it.", "It finished."], { mode: "print" });
-	await pi.session.prompt("run the job");
-	assert.equal(text(last(pi, "assistant")), "It finished.");
-	await pi.dispose();
-});
+// --mode rpc waits only when the process that started pi sets PI_BACKGROUND_SETTLE_WAIT=1
+for (const [mode, wait, waits] of [["print", undefined, true], ["rpc", "1", true], ["rpc", undefined, false]] as const) {
+	test(`--mode ${mode}${wait ? " with PI_BACKGROUND_SETTLE_WAIT=1" : ""} ${waits ? "waits for a running job and lets Pi read its result" : "settles while the job runs"}`, async (t) => {
+		if (wait) {
+			process.env.PI_BACKGROUND_SETTLE_WAIT = wait;
+			t.after(() => delete process.env.PI_BACKGROUND_SETTLE_WAIT);
+		}
+		const pi = await bgRun("./scripts/job.sh", ["Started it.", "It finished."], { mode });
+		await pi.session.prompt("run the job");
+		assert.equal(text(last(pi, "assistant")), waits ? "It finished." : "Started it.");
+		await pi.dispose();
+	});
+}
 
 // Each case waits for the hint, which shows after 3 seconds
 for (const [setting, key, data] of [[undefined, "ctrl+b", "\x02"], ["off", undefined, "\x02"]] as const) {

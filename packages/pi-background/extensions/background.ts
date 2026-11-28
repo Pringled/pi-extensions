@@ -821,10 +821,11 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	// pi -p and --mode json exit as soon as the agent settles, and session_shutdown stops the jobs with it, so wait for
-	// them here instead: a queued wake makes Pi continue and read the result. The TUI and rpc never wait: someone is chatting there
+	// them here instead: a queued wake makes Pi continue and read the result. RPC waits too when its caller asked for it
+	// with PI_BACKGROUND_SETTLE_WAIT=1; the TUI never waits, someone is chatting there
 	// Jobs started with wake_on, such as a dev server, may never end, so they never hold the exit
 	pi.on("agent_before_settle", async (_event, ctx) => {
-		if (ctx.mode !== "print" && ctx.mode !== "json") return;
+		if (ctx.mode !== "print" && ctx.mode !== "json" && !(ctx.mode === "rpc" && process.env.PI_BACKGROUND_SETTLE_WAIT === "1")) return;
 		const seen = triggerWakes;
 		const until = Date.now() + exitWaitMs();
 		while ((running().some((job) => !job.watched) || ending > 0) && triggerWakes === seen && Date.now() < until) {

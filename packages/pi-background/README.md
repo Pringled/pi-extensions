@@ -18,7 +18,7 @@ pi install npm:pi-background
 - Pi can wait for a specific line, such as a dev server's `listening on`, without checking again and again.
 - Jobs started together are reported together, so Pi answers once when the last one finishes instead of after each.
 - A shell command still running after 2 minutes moves to the background by itself, so it never holds up the turn. `ctrl+b` moves one sooner.
-- In `pi -p` and `--mode json`, Pi waits for running jobs and reads their results before it exits.
+- In `pi -p` and `--mode json`, Pi waits for running jobs and reads their results before it exits. `--mode rpc` waits too when the process that starts it sets `PI_BACKGROUND_SETTLE_WAIT=1`, for hosts such as Open WebUI that end the turn on the first settle.
 
 Pi decides when a job belongs in the background, and you can also ask, for example "run the tests in the background and tell me when they're done".
 
