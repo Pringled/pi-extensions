@@ -103,7 +103,11 @@ test("/bg scrolls output, kills a running job on double-tap x or /bg kill, and r
 		fauxAssistantMessage("Done."),
 	]);
 	await pi.session.prompt("run jobs");
-	await until(() => pi.ui.widget("background-jobs")?.filter((line) => line.includes("waiting")).length === 2);
+	// bg1 has printed its 40 lines and exited, so its footer has no "x kill"
+	await until(() => {
+		const lines = pi.ui.widget("background-jobs");
+		return lines?.filter((line) => line.includes("waiting")).length === 2 && !lines.some((line) => line.includes("bg1"));
+	});
 
 	// Open bg1 (40 lines) and test scrolling + back-to-list -> pick bg2 -> double-tap x to kill
 	const bgCommand = pi.command("/bg bg1");
